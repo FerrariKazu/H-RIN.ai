@@ -1,0 +1,71 @@
+feature,univariate_f,lasso,random_forest,gradient_boosting,xgboost,rfe,consensus,selection_count
+ratio_salary_to_experience,True,True,True,True,True,True,True,6
+ratio_interaction_AI_Score_(0-100)_div_feat_years_experience_extracted,True,True,True,True,True,True,True,6
+interaction_AI_Score_(0-100)_feat_years_experience_extracted,True,False,True,True,True,True,True,5
+interaction_Experience_(Years)_feat_years_experience_extracted,True,True,False,True,True,True,True,5
+interaction_AI_Score_(Uniform_0-100)_feat_years_experience_extracted,True,True,False,True,True,True,True,5
+feat_salary_extracted_cubed,False,True,True,True,True,True,True,5
+ratio_interaction_AI_Score_(Uniform_0-100)_div_Experience_(Years),True,True,False,True,True,True,True,5
+ratio_interaction_AI_Score_(Uniform_0-100)_div_feat_years_experience_extracted,True,False,True,True,True,True,True,5
+AI Score (Uniform 0-100)_4th,True,True,False,True,True,True,True,5
+AI Score (0-100)_4th,True,True,False,True,True,True,True,5
+experience_maturity,True,True,False,True,True,True,True,5
+interaction_Experience_(Years)_Projects_Count,True,False,False,True,True,True,True,4
+interaction_AI_Score_(Uniform_0-100)_Projects_Count,True,False,False,True,True,True,True,4
+AI Score (Uniform 0-100),True,True,False,False,True,True,True,4
+ratio_experience_to_skills,True,True,False,False,True,True,True,4
+feat_years_experience_extracted_squared,True,True,False,True,False,True,True,4
+interaction_Projects_Count_feat_years_experience_extracted,False,True,False,True,True,True,True,4
+feat_salary_extracted_squared,False,False,True,True,True,True,True,4
+interaction3_AI_Score_(Uniform_0-100)_AI_Score_(0-100)_Experience_(Years),True,False,False,True,True,True,True,4
+interaction3_Experience_(Years)_Projects_Count_feat_years_experience_extracted,True,True,False,True,True,False,True,4
+ratio_interaction_AI_Score_(Uniform_0-100)_div_AI_Score_(0-100),False,True,False,True,True,True,True,4
+ratio_interaction_AI_Score_(0-100)_div_Experience_(Years),True,False,False,True,True,True,True,4
+ratio_interaction_Experience_(Years)_div_feat_years_experience_extracted,False,True,False,True,True,True,True,4
+AI Score (Uniform 0-100)_log,True,True,False,True,True,False,True,4
+AI Score (0-100)_5th,True,True,False,True,False,True,True,4
+Experience (Years)_4th,True,False,False,True,True,True,True,4
+Experience (Years)_5th,True,True,False,True,False,True,True,4
+Projects Count_log,True,True,False,True,True,False,True,4
+ratio_interaction_AI_Score_(Uniform_0-100)_div_feat_years_experience_extracted_log_scaled,True,True,True,True,False,False,True,4
+interaction_AI_Score_(Uniform_0-100)_Projects_Count_quantile,True,True,False,True,False,True,True,4
+interaction_AI_Score_(Uniform_0-100)_Experience_(Years),True,False,False,False,True,True,True,3
+AI Score (0-100),True,False,False,False,True,True,True,3
+feat_num_skills_matched_cubed,True,False,False,False,True,True,True,3
+feat_years_experience_extracted_sqrt,True,False,False,True,True,False,True,3
+feat_years_experience_extracted,True,False,False,True,True,False,True,3
+interaction_AI_Score_(0-100)_Experience_(Years),True,False,False,False,True,True,True,3
+interaction_AI_Score_(Uniform_0-100)_AI_Score_(0-100),True,False,False,False,True,True,True,3
+interaction_AI_Score_(0-100)_Projects_Count,True,False,False,False,True,True,True,3
+feat_salary_extracted,False,False,True,True,True,False,True,3
+feat_years_experience_extracted_cubed,False,False,False,True,True,True,True,3
+Resume_ID,False,True,False,True,True,False,True,3
+interaction3_AI_Score_(Uniform_0-100)_Experience_(Years)_Projects_Count,True,False,False,True,True,False,True,3
+interaction3_AI_Score_(Uniform_0-100)_Projects_Count_feat_years_experience_extracted,False,True,False,True,True,False,True,3
+interaction3_AI_Score_(0-100)_Experience_(Years)_Projects_Count,True,False,False,True,True,False,True,3
+ratio_interaction_AI_Score_(Uniform_0-100)_div_Projects_Count,False,True,False,True,True,False,True,3
+ratio_interaction_Projects_Count_div_feat_years_experience_extracted,False,False,False,True,True,True,True,3
+AI Score (Uniform 0-100)_5th,True,False,False,True,False,True,True,3
+AI Score (0-100)_log,True,True,False,False,True,False,True,3
+Experience (Years)_log,True,True,False,False,True,False,True,3
+Projects Count_4th,False,False,False,True,True,True,True,3
+Projects Count_5th,True,True,False,False,False,True,True,3
+interaction_AI_Score_(0-100)_feat_years_experience_extracted_quantile,True,False,True,False,False,True,True,3
+interaction_AI_Score_(Uniform_0-100)_Experience_(Years)_quantile,True,True,False,False,False,True,True,3
+Projects Count,True,False,False,False,True,False,False,2
+Experience (Years),True,False,False,False,True,False,False,2
+interaction3_AI_Score_(0-100)_Projects_Count_feat_years_experience_extracted,False,False,False,True,True,False,False,2
+ratio_interaction_AI_Score_(0-100)_div_Projects_Count,False,False,False,True,True,False,False,2
+ratio_interaction_Experience_(Years)_div_Projects_Count,False,False,False,True,True,False,False,2
+Experience (Years)_exp,True,False,False,True,False,False,False,2
+Projects Count_exp,True,False,False,True,False,False,False,2
+feat_years_experience_extracted_4th,False,False,False,True,True,False,False,2
+feat_years_experience_extracted_exp,True,True,False,False,False,False,False,2
+interaction_Experience_(Years)_Projects_Count_log_scaled,True,False,False,False,False,True,False,2
+feat_num_skills_matched_cubed_log_scaled,True,True,False,False,False,False,False,2
+AI Score (Uniform 0-100)_exp,True,False,False,False,False,False,False,1
+AI Score (0-100)_exp,True,False,False,False,False,False,False,1
+feat_years_experience_extracted_5th,False,False,False,True,False,False,False,1
+feat_years_experience_extracted_log,False,False,False,True,False,False,False,1
+ratio_interaction_AI_Score_(Uniform_0-100)_div_AI_Score_(0-100)_log_scaled,False,False,False,True,False,False,False,1
+ratio_interaction_Experience_(Years)_div_feat_years_experience_extracted_log_scaled,False,False,False,True,False,False,False,1

@@ -1,0 +1,88 @@
+--- Data Completeness ---
+No missing values found.
+Total records: 1184
+Total columns: 55
+
+--- Data Consistency ---
+Data Types:
+feat_skill_python                    int64
+feat_skill_sql                       int64
+feat_skill_excel                     int64
+feat_skill_tableau                   int64
+feat_skill_power_bi                  int64
+feat_skill_project_management        int64
+feat_skill_machine_learning          int64
+feat_skill_deep_learning             int64
+feat_skill_nlp                       int64
+feat_skill_pandas                    int64
+feat_skill_numpy                     int64
+feat_skill_spark                     int64
+feat_skill_aws                       int64
+feat_skill_azure                     int64
+feat_skill_gcp                       int64
+feat_skill_docker                    int64
+feat_skill_kubernetes                int64
+feat_skill_snowflake                 int64
+feat_num_skills_matched              int64
+feat_degree_bachelor                 int64
+feat_degree_master                   int64
+feat_degree_mba                      int64
+feat_degree_phd                      int64
+feat_top_degree_level                int64
+feat_high_title                      int64
+feat_job_tech                        int64
+feat_job_sales                       int64
+feat_job_marketing                   int64
+feat_job_finance                     int64
+feat_job_operations                  int64
+feat_job_hr                          int64
+feat_job_product                     int64
+feat_job_design                      int64
+feat_cert_aws                        int64
+feat_cert_pmp                        int64
+feat_cert_scrum                      int64
+feat_cert_csm                        int64
+feat_cert_six_sigma                  int64
+feat_cert_cfa                        int64
+feat_cert_cpa                        int64
+feat_cert_azure                      int64
+feat_cert_gcp                        int64
+feat_num_promotions                  int64
+feat_years_experience_extracted      int64
+feat_has_metrics                     int64
+feat_text_len_chars                  int64
+feat_text_len_words                  int64
+Experience (Years)                   int64
+Salary Expectation ($)               int64
+Projects Count                       int64
+Resume_ID                            int64
+AI Score (0-100)                     int64
+Recruiter_Decision                  object
+_ai_bin                             object
+AI Score (Uniform 0-100)           float64
+
+Numeric Feature Value Ranges (Min/Max/Mean/Std):
+       feat_skill_python  feat_skill_sql  feat_skill_excel  feat_skill_tableau  feat_skill_power_bi  feat_skill_project_management  feat_skill_machine_learning  feat_skill_deep_learning  feat_skill_nlp  feat_skill_pandas  feat_skill_numpy  feat_skill_spark  feat_skill_aws  feat_skill_azure  feat_skill_gcp  feat_skill_docker  feat_skill_kubernetes  feat_skill_snowflake  feat_num_skills_matched  feat_degree_bachelor  feat_degree_master  feat_degree_mba  feat_degree_phd  feat_top_degree_level  feat_high_title  feat_job_tech  feat_job_sales  feat_job_marketing  feat_job_finance  feat_job_operations  feat_job_hr  feat_job_product  feat_job_design  feat_cert_aws  feat_cert_pmp  feat_cert_scrum  feat_cert_csm  feat_cert_six_sigma  feat_cert_cfa  feat_cert_cpa  feat_cert_azure  feat_cert_gcp  feat_num_promotions  feat_years_experience_extracted  feat_has_metrics  feat_text_len_chars  feat_text_len_words  Experience (Years)  Salary Expectation ($)  Projects Count    Resume_ID  AI Score (0-100)  AI Score (Uniform 0-100)
+count        1184.000000     1184.000000            1184.0              1184.0               1184.0                         1184.0                  1184.000000               1184.000000     1184.000000             1184.0            1184.0            1184.0          1184.0            1184.0          1184.0             1184.0                 1184.0                1184.0              1184.000000                1184.0              1184.0      1184.000000      1184.000000            1184.000000      1184.000000    1184.000000          1184.0              1184.0            1184.0               1184.0  1184.000000            1184.0      1184.000000    1184.000000         1184.0           1184.0         1184.0               1184.0         1184.0         1184.0           1184.0         1184.0               1184.0                           1184.0            1184.0          1184.000000          1184.000000         1184.000000             1184.000000     1184.000000  1184.000000       1184.000000               1184.000000
+mean            0.367399        0.388514               0.0                 0.0                  0.0                            0.0                     0.363176                  0.569257        0.166385                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 1.854730                   0.0                 0.0         0.218750         0.201858               1.043074         0.004223       0.858108             0.0                 0.0               0.0                  0.0     0.028716               0.0         0.184966       0.248311            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            81.144426            12.103041            2.701858            78579.040541        4.323480   492.882601         65.139358                 50.042230
+std             0.482300        0.487618               0.0                 0.0                  0.0                            0.0                     0.481118                  0.495390        0.372583                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 1.263645                   0.0                 0.0         0.413573         0.401556               1.266915         0.064874       0.349087             0.0                 0.0               0.0                  0.0     0.167078               0.0         0.388434       0.432216            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            14.983008             1.430683            2.747743            23224.538766        3.034196   286.981060         23.548335                 28.709643
+min             0.000000        0.000000               0.0                 0.0                  0.0                            0.0                     0.000000                  0.000000        0.000000                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 0.000000                   0.0                 0.0         0.000000         0.000000               0.000000         0.000000       0.000000             0.0                 0.0               0.0                  0.0     0.000000               0.0         0.000000       0.000000            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            52.000000             9.000000            0.000000            40085.000000        0.000000     3.000000         15.000000                  0.548986
+25%             0.000000        0.000000               0.0                 0.0                  0.0                            0.0                     0.000000                  0.000000        0.000000                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 1.000000                   0.0                 0.0         0.000000         0.000000               0.000000         0.000000       1.000000             0.0                 0.0               0.0                  0.0     0.000000               0.0         0.000000       0.000000            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            69.000000            11.000000            0.000000            59002.250000        2.000000   244.000000         48.750000                 28.800676
+50%             0.000000        0.000000               0.0                 0.0                  0.0                            0.0                     0.000000                  1.000000        0.000000                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 2.000000                   0.0                 0.0         0.000000         0.000000               0.000000         0.000000       1.000000             0.0                 0.0               0.0                  0.0     0.000000               0.0         0.000000       0.000000            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            80.000000            12.000000            2.000000            77893.000000        4.000000   498.000000         62.500000                 49.324324
+75%             1.000000        1.000000               0.0                 0.0                  0.0                            0.0                     1.000000                  1.000000        0.000000                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 3.000000                   0.0                 0.0         0.000000         0.000000               2.000000         0.000000       1.000000             0.0                 0.0               0.0                  0.0     0.000000               0.0         0.000000       0.000000            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0            91.000000            13.000000            4.000000            98317.000000        7.000000   733.750000         80.000000                 72.128378
+max             1.000000        1.000000               0.0                 0.0                  0.0                            0.0                     1.000000                  1.000000        1.000000                0.0               0.0               0.0             0.0               0.0             0.0                0.0                    0.0                   0.0                 4.000000                   0.0                 0.0         1.000000         1.000000               3.000000         1.000000       1.000000             0.0                 0.0               0.0                  0.0     1.000000               0.0         1.000000       1.000000            0.0              0.0            0.0                  0.0            0.0            0.0              0.0            0.0                  0.0                              0.0               0.0           125.000000            16.000000           10.000000           119478.000000       10.000000   999.000000        100.000000                 90.371622
+
+--- Data Accuracy (Outliers) ---
+Potential outliers in feat_skill_nlp: 197 records (16.64% of data).
+Potential outliers in feat_degree_mba: 259 records (21.88% of data).
+Potential outliers in feat_degree_phd: 239 records (20.19% of data).
+Potential outliers in feat_high_title: 5 records (0.42% of data).
+Potential outliers in feat_job_tech: 168 records (14.19% of data).
+Potential outliers in feat_job_hr: 34 records (2.87% of data).
+Potential outliers in feat_job_design: 219 records (18.50% of data).
+Potential outliers in feat_cert_aws: 294 records (24.83% of data).
+Potential outliers in feat_text_len_chars: 4 records (0.34% of data).
+
+--- Structural Integrity ---
+Duplicate rows found: 707
+Encoding: Assumed UTF-8 (handled by pandas read_csv).

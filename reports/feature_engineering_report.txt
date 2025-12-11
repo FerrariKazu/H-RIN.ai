@@ -1,0 +1,109 @@
+Feature Engineering Report
+--------------------------
+Total samples: 1,000
+AI_High_Performer (1): 883 (88%)
+AI_High_Performer (0): 117 (12%)
+
+Created features (prefix feat_ or tfidf_):
+- feat_skill_python
+- feat_skill_sql
+- feat_skill_excel
+- feat_skill_tableau
+- feat_skill_power_bi
+- feat_skill_project_management
+- feat_skill_machine_learning
+- feat_skill_deep_learning
+- feat_skill_nlp
+- feat_skill_pandas
+- feat_skill_numpy
+- feat_skill_spark
+- feat_skill_aws
+- feat_skill_azure
+- feat_skill_gcp
+- feat_skill_docker
+- feat_skill_kubernetes
+- feat_skill_snowflake
+- feat_num_skills_matched
+- feat_degree_bachelor
+- feat_degree_master
+- feat_degree_mba
+- feat_degree_phd
+- feat_top_degree_level
+- feat_high_title
+- feat_job_tech
+- feat_job_sales
+- feat_job_marketing
+- feat_job_finance
+- feat_job_operations
+- feat_job_hr
+- feat_job_product
+- feat_job_design
+- feat_cert_aws
+- feat_cert_pmp
+- feat_cert_scrum
+- feat_cert_csm
+- feat_cert_six_sigma
+- feat_cert_cfa
+- feat_cert_cpa
+- feat_cert_azure
+- feat_cert_gcp
+- feat_num_promotions
+- feat_years_experience_extracted
+- feat_has_metrics
+- feat_num_numbers
+- feat_text_len_chars
+- feat_text_len_words
+- feat_num_bullets
+
+Per-feature prevalence and positive rates:
+feat_skill_python: prevalence 38.8% | AI_High_Performer rate: 1s=89.4%, 0s=87.6%
+feat_skill_sql: prevalence 37.0% | AI_High_Performer rate: 1s=89.2%, 0s=87.8%
+feat_skill_excel: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_tableau: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_power_bi: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_project_management: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_machine_learning: prevalence 20.0% | AI_High_Performer rate: 1s=91.0%, 0s=87.6%
+feat_skill_deep_learning: prevalence 39.8% | AI_High_Performer rate: 1s=91.7%, 0s=86.0%
+feat_skill_nlp: prevalence 19.5% | AI_High_Performer rate: 1s=87.7%, 0s=88.4%
+feat_skill_pandas: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_numpy: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_spark: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_aws: prevalence 24.9% | AI_High_Performer rate: 1s=89.6%, 0s=87.9%
+feat_skill_azure: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_gcp: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_docker: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_kubernetes: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_skill_snowflake: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_degree_bachelor: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_degree_master: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_degree_mba: prevalence 20.2% | AI_High_Performer rate: 1s=86.1%, 0s=88.8%
+feat_degree_phd: prevalence 19.7% | AI_High_Performer rate: 1s=90.9%, 0s=87.7%
+feat_high_title: prevalence 0.8% | AI_High_Performer rate: 1s=100.0%, 0s=88.2%
+feat_job_tech: prevalence 100.0% | AI_High_Performer rate: 1s=88.3%, 0s=nan%
+feat_job_sales: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_marketing: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_finance: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_operations: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_hr: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_product: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_job_design: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_aws: prevalence 24.9% | AI_High_Performer rate: 1s=89.6%, 0s=87.9%
+feat_cert_pmp: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_scrum: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_csm: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_six_sigma: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_cfa: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_cpa: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_azure: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_cert_gcp: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_num_promotions: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_has_metrics: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_num_numbers: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+feat_num_bullets: prevalence 0.0% | AI_High_Performer rate: 1s=nan%, 0s=88.3%
+
+Top 20 features by mutual information:
+(mutual information ranking disabled or unavailable)
+
+Note: Class imbalance was previously detected; consider stratified splits, class weights, or resampling in later steps.
+
+TF-IDF features not generated (disabled or unavailable).

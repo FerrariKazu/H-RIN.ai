@@ -1,0 +1,75 @@
+Repair Report v3
+
+This report details the changes and current state of the dataset after several repair and normalization steps.
+
+Input Dataset: data/normalized_dataset_v3.csv
+
+Key Changes:
+- Duplicate rows were identified and removed from the dataset. A total of 707 duplicate records were removed, reducing the dataset size from 1184 to 477 unique records.
+
+Metrics based on data/normalized_dataset_v3.csv:
+
+Resumes processed: 477
+Recruiter_Decision distribution:
+  Hire: 296
+  Reject: 181
+
+feat_num_skills_matched:
+  mean: 1.9056603773584906
+  std: 1.2823582505421296
+  min: 0
+  max: 4
+
+feat_years_experience_extracted:
+  mean: 0.0
+  std: 0.0
+  min: 0
+  max: 0
+
+feat_text_len_chars:
+  mean: 81.47798742138365
+  std: 15.250500671484
+  min: 52
+  max: 125
+
+feat_text_len_words:
+  mean: 12.150943396226415
+  std: 1.4831915929545754
+  min: 9
+  max: 16
+
+Experience (Years):
+  mean: 3.220125786163522
+  std: 2.846155741549117
+  min: 0
+  max: 10
+
+Salary Expectation ($):
+  mean: 78243.37526205451
+  std: 23207.29737304591
+  min: 40085
+  max: 119478
+
+Projects Count:
+  mean: 4.660377358490566
+  std: 3.165923183717598
+  min: 0
+  max: 10
+
+AI Score (0-100):
+  mean: 70.79664570230608
+  std: 22.51037457518123
+  min: 15
+  max: 100
+
+Job domains:
+  feat_job_tech: 410
+  feat_job_sales: 0
+  feat_job_marketing: 0
+  feat_job_finance: 0
+  feat_job_operations: 0
+  feat_job_hr: 17
+  feat_job_product: 0
+  feat_job_design: 89
+
+Further analysis will be conducted to ensure data quality and prepare for SLM training.

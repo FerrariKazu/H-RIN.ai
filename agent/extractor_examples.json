@@ -1,0 +1,76 @@
+[
+  {
+    "resume_text": "Data Scientist with 7 years of experience. Python, SQL, Pandas, NumPy. Built models with scikit-learn and TensorFlow on AWS. Dockerized microservices and deployed with Kubernetes. AWS Certified Solutions Architect.",
+    "expected_skills": [
+      "feat_skill_python",
+      "feat_skill_sql",
+      "feat_skill_pandas",
+      "feat_skill_numpy",
+      "feat_skill_machine_learning",
+      "feat_skill_deep_learning",
+      "feat_skill_aws",
+      "feat_skill_docker",
+      "feat_skill_kubernetes"
+    ],
+    "expected_certifications": [
+      "feat_cert_aws"
+    ],
+    "expected_domains": [
+      "feat_job_tech"
+    ]
+  },
+  {
+    "resume_text": "Business Analyst experienced with Excel (advanced), Power BI dashboards, and SQL for analytics. Led Agile projects and managed stakeholders; Scrum and Kanban expertise.",
+    "expected_skills": [
+      "feat_skill_excel",
+      "feat_skill_power_bi",
+      "feat_skill_sql",
+      "feat_skill_project_management"
+    ],
+    "expected_certifications": [],
+    "expected_domains": [
+      "feat_job_marketing",
+      "feat_job_product"
+    ]
+  },
+  {
+    "resume_text": "Marketing Manager specializing in SEO/SEM, campaign strategy, and content marketing. Built dashboards in Tableau and collaborated with product teams.",
+    "expected_skills": [
+      "feat_skill_tableau",
+      "feat_skill_project_management"
+    ],
+    "expected_certifications": [],
+    "expected_domains": [
+      "feat_job_marketing",
+      "feat_job_product"
+    ]
+  },
+  {
+    "resume_text": "Finance Analyst with CPA, financial modeling, budgeting, and Snowflake DW experience. Strong Excel and SQL for data analysis.",
+    "expected_skills": [
+      "feat_skill_snowflake",
+      "feat_skill_excel",
+      "feat_skill_sql"
+    ],
+    "expected_certifications": [
+      "feat_cert_cpa"
+    ],
+    "expected_domains": [
+      "feat_job_finance"
+    ]
+  },
+  {
+    "resume_text": "Operations Lead (Lean Six Sigma Black Belt). Managed logistics, process improvement, and used AWS + Spark for ETL pipelines. Agile project management across cross-functional teams.",
+    "expected_skills": [
+      "feat_skill_aws",
+      "feat_skill_spark",
+      "feat_skill_project_management"
+    ],
+    "expected_certifications": [
+      "feat_cert_six_sigma"
+    ],
+    "expected_domains": [
+      "feat_job_operations"
+    ]
+  }
+]

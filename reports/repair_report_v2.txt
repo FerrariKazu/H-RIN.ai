@@ -1,0 +1,31 @@
+Repair Report (v2)
+===================
+Input: data/normalized_dataset_v2.csv
+
+Summary of Changes
+- Dropped constant features: feat_num_numbers, feat_num_bullets
+- Improved skill match rate (feat_num_skills_matched): 1800 -> 1912 (+112)
+
+Updated Key Metrics
+- Resumes processed: 1000
+- Recruiter_Decision distribution: positive=812, negative=188
+- feat_num_skills_matched: mean=1.91, std=1.28, min=0.00, max=4.00
+- feat_years_experience_extracted: mean=0.00, std=0.00, min=0.00, max=0.00
+- feat_text_len_chars: mean=81.47, std=15.55, min=50.00, max=126.00
+- feat_text_len_words: mean=12.23, std=1.49, min=9.00, max=17.00
+- Experience (Years): mean=4.90, std=3.11, min=0.00, max=10.00
+- Salary Expectation ($): mean=79994.49, std=23048.47, min=40085.00, max=119901.00
+- Projects Count: mean=5.13, std=3.23, min=0.00, max=10.00
+- AI Score (0-100): mean=83.95, std=20.98, min=15.00, max=100.00
+
+Stability Confirmation
+- Job domains remain consistent post-fix:
+  * feat_job_design: 194
+  * feat_job_finance: 0
+  * feat_job_hr: 31
+  * feat_job_marketing: 0
+  * feat_job_operations: 0
+  * feat_job_product: 0
+  * feat_job_sales: 0
+  * feat_job_tech: 861
+- Labels preserved; no remapping performed for Recruiter_Decision.

@@ -1,0 +1,13 @@
+Baseline Model Evaluation (Validation Set)
+-----------------------------------------
+Features used: 55 columns
+Model chosen: pure_numpy_logistic
+ROC AUC: 1.0000
+PR AUC: 1.0000
+F1: 1.0000
+Precision: 1.0000
+Recall: 1.0000
+Chosen threshold (F1-optimal): 0.20
+Confusion Matrix:
+[TN=23 FP=0]
+[FN=0 TP=176]

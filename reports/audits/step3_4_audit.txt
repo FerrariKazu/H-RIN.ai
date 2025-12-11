@@ -1,0 +1,7 @@
+Audit summary and decisions
+---------------------------
+Numeric features: 8
+Boolean/binary features: 44
+No non-binary categorical columns found.
+Winsorization: used
+Imbalance best strategy (CV): class_weights

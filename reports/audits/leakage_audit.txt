@@ -1,0 +1,13 @@
+Leakage Audit
+--------------
+Grouping column: Resume_ID (used only to enforce group-aware split)
+Dropped features to reduce leakage:
+- AI Score (0-100)
+- AI Score (0-100)_reflect_log
+- Resume_ID
+
+Rationale:
+- 'AI Score (0-100)' and its log variant are highly correlated with the target and can introduce target leakage.
+- 'Resume_ID' is an identifier, not predictive content; excluding it avoids group mixing in features.
+
+Features used after dropping: 52

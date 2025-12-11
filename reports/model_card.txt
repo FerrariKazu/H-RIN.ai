@@ -1,0 +1,64 @@
+Model Card — AM-DS-01
+======================
+
+Overview
+--------
+- Purpose: Rank candidates and flag recruiter-ready profiles.
+- Models:
+  - Model A (Regression): Predicts `AI Score (0-100)`.
+  - Model B (Classification): Predicts `Recruiter_Decision` probability.
+- Data: `data/enriched_dataset.csv` (engineered features from resumes)
+- Splits: 5-fold GroupKFold by `Resume_ID` to prevent leakage.
+
+Training & Features
+-------------------
+- Seed: 42
+- Features: see `pipeline_config.json` (`features_used`)
+- Imbalance handling (CV): `class_weights` selected; benchmark compared undersample/oversample.
+- Winsorization: used for robust numeric handling.
+- Categorical: No non-binary categorical columns found; binary booleans retained.
+
+Metrics (CV)
+------------
+- Model A (AI Score): MAE 6.018, RMSE 8.133, R² 0.847; Pearson 0.946; Spearman 0.884.
+- Model B (Recruiter): ROC AUC 0.9976; PR AUC 0.99947; F1 0.9902; Precision 0.9866; Recall 0.9938.
+- Calibration (Model B): Mean Brier improved 0.03135 → 0.02711.
+
+Holdout (Model B)
+-----------------
+- ROC AUC 0.99718; PR AUC 0.99936; F1 0.98788.
+- Best threshold: 0.12; cost-opt thresholds (1:1, 3:1, 5:1): 0.12.
+- Confusion matrix [[TN, FP], [FN, TP]]: [[33, 4], [0, 163]].
+
+Calibration & Thresholding
+--------------------------
+- Reliability improved post-calibration; see `plots/model_b/reliability_plot_recruiter.png`.
+- Threshold selection via F1/cost sweep; see `metrics/holdout/threshold_report.txt`.
+
+Artifacts & Pointers
+--------------------
+- Latest models: `models/latest/ai_score_model.pkl`, `models/latest/recruiter_model.pkl` (best).
+- Metrics: `metrics/cv/*`, `metrics/holdout/*`, `metrics/benchmark/*`, `metrics/coefficients/*`.
+- Audits: `reports/audits/*`; Summary: `reports/project_summary.md`.
+
+Intended Use
+------------
+- Assist recruiters by prioritizing candidates; Model B flags likely recruiter-ready profiles.
+- Model A provides an interpretable composite score for ranking and QA.
+
+Limitations
+-----------
+- CV metrics are high; monitor drift and real-world performance.
+- Threshold 0.12 optimized for current class distribution; revisit with new data.
+- Feature availability and extraction quality affect consistency.
+
+Ethical Considerations
+----------------------
+- Avoid sensitive attributes; ensure fairness audits before deployment.
+- Provide human oversight; do not use for automated rejection without review.
+
+Operational Guardrails
+----------------------
+- Use `configs/latest.json` for stable pointers.
+- Preserve path compatibility via `relocation_map.json` and `manifest.json`.
+- Log versioned summaries under `reports/`.

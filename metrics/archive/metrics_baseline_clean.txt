@@ -1,0 +1,34 @@
+Baseline Model Evaluation (Validation Set)
+-----------------------------------------
+Features used: 52 columns
+Model chosen: pure_numpy_logistic
+ROC AUC: 0.9993
+PR AUC: 0.9999
+F1: 0.9972
+Precision: 0.9944
+Recall: 1.0000
+Chosen threshold (F1-optimal): 0.19
+Confusion Matrix:
+[TN=22 FP=1]
+[FN=0 TP=176]
+Top 20 features by |coefficient|:
+- Projects Count: 2.389136 (|coef|=2.389136)
+- feat_years_experience_extracted: 1.988196 (|coef|=1.988196)
+- Experience (Years): 1.986550 (|coef|=1.986550)
+- feat_text_len_words: 0.877992 (|coef|=0.877992)
+- feat_high_title: 0.264806 (|coef|=0.264806)
+- feat_text_len_chars: 0.164804 (|coef|=0.164804)
+- feat_skill_machine_learning: -0.144965 (|coef|=0.144965)
+- feat_top_degree_level: 0.128881 (|coef|=0.128881)
+- feat_skill_python: 0.123379 (|coef|=0.123379)
+- feat_degree_phd: 0.122684 (|coef|=0.122684)
+- feat_skill_aws: 0.093014 (|coef|=0.093014)
+- feat_cert_aws: 0.084216 (|coef|=0.084216)
+- Salary Expectation ($): 0.056198 (|coef|=0.056198)
+- feat_skill_nlp: -0.038049 (|coef|=0.038049)
+- feat_degree_mba: 0.032745 (|coef|=0.032745)
+- feat_num_skills_matched: 0.029527 (|coef|=0.029527)
+- feat_job_hr: 0.021416 (|coef|=0.021416)
+- feat_skill_power_bi: -0.019510 (|coef|=0.019510)
+- feat_skill_project_management: -0.013022 (|coef|=0.013022)
+- feat_skill_sql: -0.012687 (|coef|=0.012687)

@@ -1,0 +1,3 @@
+PR AUC base=0.9996, wins=0.9996
+Brier base=0.0261, wins=0.0261
+Decision: Use winsorized numeric

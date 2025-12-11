@@ -1,0 +1,12 @@
+DATASET BALANCING REPORT
+==================================================
+
+SUMMARY
+--------------------
+Original dataset size: 969 records
+Balanced dataset size: 969 records
+Records added: 0
+
+VALIDATION RESULTS
+-------------------------
+Hire ratio: 52.5% (target: 45-55%)

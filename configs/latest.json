@@ -1,0 +1,22 @@
+{
+  "run_id": "20251112_0255",
+  "models": {
+    "model_a_path": "models/latest/ai_score_model.pkl",
+    "model_b_path": "models/latest/recruiter_model.pkl"
+  },
+  "metrics": {
+    "cv_model_a": "metrics/cv/ai_score_cv_metrics.json",
+    "cv_model_b": "metrics/cv/recruiter_cv_metrics.json",
+    "holdout_model_b": "metrics/holdout/holdout_metrics.json",
+    "thresholds_model_b": "metrics/holdout/threshold_report.txt"
+  },
+  "reports": {
+    "project_summary": "reports/project_summary.md",
+    "audits_dir": "reports/audits"
+  },
+  "plots": {
+    "model_a_dir": "plots/model_a",
+    "model_b_dir": "plots/model_b",
+    "benchmark_dir": "plots/benchmark"
+  }
+}

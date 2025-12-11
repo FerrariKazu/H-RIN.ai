@@ -1,0 +1,18 @@
+{
+  "original_features": 53,
+  "final_features": 53,
+  "scaling_methods_applied": 53,
+  "features_not_scaled": 0,
+  "high_variance_features": 12,
+  "skewed_features": 13,
+  "well_distributed_features": 19,
+  "problematic_features": 34,
+  "high_correlation_pairs": 35,
+  "outlier_features_analyzed": 10,
+  "training_samples": 678,
+  "validation_samples": 145,
+  "test_samples": 146,
+  "target_balance_train": "52.5% positive",
+  "target_balance_val": "52.4% positive",
+  "target_balance_test": "52.7% positive"
+}

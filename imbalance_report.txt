@@ -1,0 +1,19 @@
+Target Variable Analysis: AI_High_Performer
+------------------------------------------
+Total samples: 1,000
+High Performers (1): 883 (88%)
+Not High Performers (0): 117 (12%)
+
+⚠️ Warning: Significant class imbalance detected (88.3% positive, 11.7% negative).
+Recommendation: Consider applying resampling techniques like SMOTE or random under/over sampling during model training.
+
+Dataset Summary (numeric columns):
+         Resume_ID  Experience (Years)  Salary Expectation ($)  Projects Count  AI Score (0-100)  AI Score (0-100)_reflect_log  AI_High_Performer
+count  1000.000000         1000.000000             1000.000000      1000.00000       1000.000000                   1000.000000        1000.000000
+mean    500.500000            4.896000            79994.486000         5.13300         83.950000                      1.639084           0.883000
+std     288.819436            3.112695            23048.472549         3.23137         20.983036                      1.722772           0.321581
+min       1.000000            0.000000            40085.000000         0.00000         15.000000                      0.000000           0.000000
+25%     250.750000            2.000000            60415.750000         2.00000         70.000000                      0.000000           1.000000
+50%     500.500000            5.000000            79834.500000         5.00000        100.000000                      0.000000           1.000000
+75%     750.250000            8.000000            99583.250000         8.00000        100.000000                      3.433987           1.000000
+max    1000.000000           10.000000           119901.000000        10.00000        100.000000                      4.454347           1.000000

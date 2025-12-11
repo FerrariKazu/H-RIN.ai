@@ -1,0 +1,12 @@
+Numeric Features Audit Report
+-----------------------------
+
+This report confirms the status of numeric features after data cleaning and normalization.
+
+Input Dataset: data/normalized_dataset_v3.csv
+Rows: 477
+
+Audit Result:
+No new near-constant flags were identified in the numeric features of `data/normalized_dataset_v3.csv`. All previously identified constant features (e.g., `feat_num_numbers`, `feat_num_bullets`) were addressed in earlier processing steps or are no longer present in the dataset after duplicate removal and column dropping.
+
+Further monitoring will be conducted as the dataset evolves.

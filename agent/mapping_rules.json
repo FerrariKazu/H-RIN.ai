@@ -1,0 +1,104 @@
+{
+  "feat_skill_python": [
+    "python", "py", "python3", "python 3", "python developer", "cpython",
+    "python programming", "python language", "python coder"
+  ],
+  "feat_skill_sql": [
+    "sql", "mysql", "postgres", "postgresql", "sql server", "oracle sql",
+    "t-sql", "tsql", "bigquery sql", "ansi sql"
+  ],
+  "feat_skill_excel": [
+    "excel", "microsoft excel", "advanced excel", "xls", "xlsx",
+    "pivot tables", "vlookup", "excel formulas", "excel modeling"
+  ],
+  "feat_skill_tableau": [
+    "tableau", "tableau desktop", "tableau server", "tableau prep", "tableau dashboards"
+  ],
+  "feat_skill_power_bi": [
+    "power bi", "microsoft power bi", "dax", "power query", "powerbi",
+    "power bi dashboard", "pbi"
+  ],
+  "feat_skill_project_management": [
+    "project management", "pm", "project manager", "scrum master", "kanban",
+    "agile", "waterfall", "roadmap", "backlog", "stakeholder management",
+    "project planning", "sprints", "user stories"
+  ],
+  "feat_skill_machine_learning": [
+    "machine learning", "ml", "supervised learning", "unsupervised learning",
+    "model training", "classification", "regression", "sklearn",
+    "scikit-learn", "feature engineering", "cross-validation"
+  ],
+  "feat_skill_deep_learning": [
+    "deep learning", "dl", "neural network", "cnn", "rnn", "lstm",
+    "transformer", "tensorflow", "keras", "pytorch"
+  ],
+  "feat_skill_nlp": [
+    "nlp", "natural language processing", "spacy", "nltk", "bert",
+    "language model", "text mining", "tokenization", "word embeddings"
+  ],
+  "feat_skill_pandas": [
+    "pandas", "pd", "dataframe", "series", "python pandas"
+  ],
+  "feat_skill_numpy": [
+    "numpy", "np", "linear algebra", "vectorized", "ndarray"
+  ],
+  "feat_skill_spark": [
+    "spark", "pyspark", "apache spark", "spark sql", "databricks"
+  ],
+  "feat_skill_aws": [
+    "aws", "amazon web services", "ec2", "s3", "lambda", "glue",
+    "athena", "cloudwatch", "route 53", "cloudformation"
+  ],
+  "feat_skill_azure": [
+    "azure", "microsoft azure", "azure ml", "azure data factory",
+    "azure devops", "azure storage", "azure synapse"
+  ],
+  "feat_skill_gcp": [
+    "gcp", "google cloud", "bigquery", "vertex ai", "cloud run",
+    "dataflow", "pub/sub"
+  ],
+  "feat_skill_docker": [
+    "docker", "container", "containerization", "dockerfile", "compose", "docker compose"
+  ],
+  "feat_skill_kubernetes": [
+    "kubernetes", "k8s", "kubectl", "helm", "cluster", "pods", "deployment"
+  ],
+  "feat_skill_snowflake": [
+    "snowflake", "snowflake sql", "snowpark", "data warehouse", "snowflake db"
+  ],
+
+  "feat_cert_aws": [
+    "aws certified", "aws certification", "aws certified solutions architect",
+    "solutions architect associate", "solutions architect professional",
+    "cloud practitioner", "aws developer associate", "sysops administrator"
+  ],
+  "feat_cert_pmp": [
+    "pmp", "project management professional", "pmi pmp", "pmp certification"
+  ],
+  "feat_cert_scrum": [
+    "scrum", "scrum certificate", "scrum.org", "psm", "professional scrum master"
+  ],
+  "feat_cert_csm": [
+    "csm", "certified scrum master", "scrum alliance"
+  ],
+  "feat_cert_six_sigma": [
+    "six sigma", "lean six sigma", "green belt", "black belt",
+    "lean six sigma black belt", "lean six sigma green belt"
+  ],
+  "feat_cert_cfa": [
+    "cfa", "chartered financial analyst", "cfa institute"
+  ],
+  "feat_cert_cpa": [
+    "cpa", "certified public accountant", "aicpa"
+  ],
+  "feat_cert_azure": [
+    "azure certified", "microsoft certified", "azure administrator",
+    "azure fundamentals", "az-900", "az 900", "az900",
+    "az-204", "az 204", "az204", "dp-100", "dp 100", "dp100",
+    "dp-203", "dp 203", "dp203"
+  ],
+  "feat_cert_gcp": [
+    "gcp certified", "google cloud certified", "professional data engineer",
+    "associate cloud engineer", "professional cloud engineer"
+  ]
+}

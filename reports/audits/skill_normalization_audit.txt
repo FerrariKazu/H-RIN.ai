@@ -1,0 +1,38 @@
+Normalization Audit Report
+==========================
+Input: data\enriched_dataset.csv
+Output: data\normalized_dataset_v2.csv
+Resumes processed: 1000
+
+Skill Flag Counts (before -> after)
+- feat_skill_aws: 249 -> 0
+- feat_skill_azure: 0 -> 0
+- feat_skill_deep_learning: 398 -> 584
+- feat_skill_docker: 0 -> 0
+- feat_skill_excel: 0 -> 0
+- feat_skill_gcp: 0 -> 0
+- feat_skill_kubernetes: 0 -> 0
+- feat_skill_machine_learning: 200 -> 375
+- feat_skill_nlp: 195 -> 195
+- feat_skill_numpy: 0 -> 0
+- feat_skill_pandas: 0 -> 0
+- feat_skill_power_bi: 0 -> 0
+- feat_skill_project_management: 0 -> 0
+- feat_skill_python: 388 -> 388
+- feat_skill_snowflake: 0 -> 0
+- feat_skill_spark: 0 -> 0
+- feat_skill_sql: 370 -> 370
+- feat_skill_tableau: 0 -> 0
+
+Job Domain Flag Counts (before -> after)
+- feat_job_design: 0 -> 194
+- feat_job_finance: 0 -> 0
+- feat_job_hr: 0 -> 31
+- feat_job_marketing: 0 -> 0
+- feat_job_operations: 0 -> 0
+- feat_job_product: 0 -> 0
+- feat_job_sales: 0 -> 0
+- feat_job_tech: 1000 -> 861
+
+Skill coverage (feat_num_skills_matched): 1800 -> 1912
+Coverage improvement: 112 (6.22% change)
