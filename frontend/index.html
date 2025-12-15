@@ -202,6 +202,31 @@
         </main>
     </div>
 
+    <!-- Modals -->
+    <div id="acceptance-modal" class="modal">
+        <div class="modal-content">
+            <h3>✅ Accept Candidate</h3>
+            <p>Accept <strong id="accept-candidate-name">Candidate</strong> for the position?</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="continueAcceptance()">Continue</button>
+                <button class="btn-secondary" onclick="emailAcceptance()">📧 Email</button>
+                <button class="btn-cancel" onclick="closeModal('acceptance-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="refusal-modal" class="modal">
+        <div class="modal-content">
+            <h3>❌ Refuse Candidate</h3>
+            <p>Refuse <strong id="refuse-candidate-name">Candidate</strong>?</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="continueRefusal()">Continue</button>
+                <button class="btn-secondary" onclick="emailRefusal()">📧 Email</button>
+                <button class="btn-cancel" onclick="closeModal('refusal-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="js/three-bg.js"></script>
     <script type="module" src="js/main.js"></script>

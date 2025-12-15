@@ -224,7 +224,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Extract name from persons entities if not in resume
         let candidateName = resume.name || contact.name || "Unknown";
         if (candidateName === "Unknown" && entities.persons && entities.persons.length > 0) {
-            candidateName = entities.persons[0];
+            // Check if first person is object or string
+            const firstPerson = entities.persons[0];
+            candidateName = (typeof firstPerson === 'object' && firstPerson.text) ? firstPerson.text : String(firstPerson);
         }
         
         // Calculate total experience in years and months
@@ -257,25 +259,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // Extract extra links (github, etc)
         const extraLinks = [];
         if (contact.linkedin) {
-            extraLinks.push(`<a href="${contact.linkedin}" target="_blank" style="color:var(--accent);margin-right:1rem">LinkedIn</a>`);
+            // Ensure proper URL format
+            const linkedinUrl = contact.linkedin.startsWith('http') ? contact.linkedin : `https://${contact.linkedin}`;
+            extraLinks.push(`<a href="${linkedinUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">LinkedIn</a>`);
         }
         if (contact.github) {
-            extraLinks.push(`<a href="${contact.github}" target="_blank" style="color:var(--accent);margin-right:1rem">GitHub</a>`);
+            const githubUrl = contact.github.startsWith('http') ? contact.github : `https://${contact.github}`;
+            extraLinks.push(`<a href="${githubUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">GitHub</a>`);
         }
         if (contact.website) {
-            extraLinks.push(`<a href="${contact.website}" target="_blank" style="color:var(--accent);margin-right:1rem">Website</a>`);
+            const websiteUrl = contact.website.startsWith('http') ? contact.website : `https://${contact.website}`;
+            extraLinks.push(`<a href="${websiteUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">Website</a>`);
         }
         if (contact.portfolio) {
-            extraLinks.push(`<a href="${contact.portfolio}" target="_blank" style="color:var(--accent);margin-right:1rem">Portfolio</a>`);
+            const portfolioUrl = contact.portfolio.startsWith('http') ? contact.portfolio : `https://${contact.portfolio}`;
+            extraLinks.push(`<a href="${portfolioUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">Portfolio</a>`);
         }
         
-        // 1. Summary Section
+        // Store candidate name globally for modal usage
+        window.candidateName = candidateName;
+        window.candidateEmail = contact.email || "";
+        
+        // 1. Summary Section - Add Accept/Refuse buttons
         document.getElementById('profile-content').innerHTML = `
             <p><strong>Name:</strong> ${candidateName}</p>
             <p><strong>Email:</strong> ${contact.email || "N/A"}</p>
             <p><strong>Phone:</strong> ${contact.phone || "N/A"}</p>
             <div style="margin-top:0.5rem">
                 ${extraLinks.join('')}
+            </div>
+            <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
+                <button class="btn-accept" onclick="showAcceptanceModal()">✅ Accept</button>
+                <button class="btn-refuse" onclick="showRefusalModal()">❌ Refuse</button>
             </div>
         `;
         
@@ -726,3 +741,83 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 }); // End DOMContentLoaded
+
+// Global Modal Functions (outside DOMContentLoaded for onclick accessibility)
+function showAcceptanceModal() {
+    const modal = document.getElementById('acceptance-modal');
+    const nameSpan = document.getElementById('accept-candidate-name');
+    nameSpan.textContent = window.candidateName || 'Candidate';
+    modal.style.display = 'flex';
+}
+
+function showRefusalModal() {
+    const modal = document.getElementById('refusal-modal');
+    const nameSpan = document.getElementById('refuse-candidate-name');
+    nameSpan.textContent = window.candidateName || 'Candidate';
+    modal.style.display = 'flex';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function continueAcceptance() {
+    alert(`✅ ${window.candidateName || 'Candidate'} has been accepted!`);
+    closeModal('acceptance-modal');
+}
+
+function continueRefusal() {
+    alert(`❌ ${window.candidateName || 'Candidate'} has been refused.`);
+    closeModal('refusal-modal');
+}
+
+function emailAcceptance() {
+    const name = window.candidateName || 'Candidate';
+    const email = window.candidateEmail || '';
+    
+    const subject = encodeURIComponent(`Congratulations - Your Application Has Been Accepted`);
+    const body = encodeURIComponent(
+        `Dear ${name},\n\n` +
+        `We are pleased to inform you that your application has been accepted!\n\n` +
+        `After carefully reviewing your profile, experience, and qualifications, we believe you would be an excellent fit for our team. ` +
+        `Your skills and background align perfectly with what we're looking for.\n\n` +
+        `We would love to discuss the next steps with you. Please let us know your availability for a call or meeting ` +
+        `at your earliest convenience.\n\n` +
+        `We look forward to working with you!\n\n` +
+        `Best regards,\n` +
+        `[Your Company Name]\n` +
+        `Hiring Team`
+    );
+    
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    closeModal('acceptance-modal');
+}
+
+function emailRefusal() {
+    const name = window.candidateName || 'Candidate';
+    const email = window.candidateEmail || '';
+    
+    const subject = encodeURIComponent(`Update on Your Application`);
+    const body = encodeURIComponent(
+        `Dear ${name},\n\n` +
+        `Thank you for taking the time to apply and for your interest in our company.\n\n` +
+        `After careful consideration of all applications, we regret to inform you that we have decided to move forward ` +
+        `with other candidates whose qualifications more closely match our current requirements.\n\n` +
+        `We truly appreciate the effort you put into your application and the opportunity to learn about your background. ` +
+        `We encourage you to apply for future positions that match your skills and experience.\n\n` +
+        `We wish you all the best in your job search and future endeavors.\n\n` +
+        `Best regards,\n` +
+        `[Your Company Name]\n` +
+        `Hiring Team`
+    );
+    
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    closeModal('refusal-modal');
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
