@@ -83,6 +83,19 @@
                     <input type="file" id="file-input" accept=".pdf" hidden>
                 </div>
 
+                <!-- Job Requirements Section -->
+                <div class="job-requirements-section">
+                    <h3><i data-lucide="briefcase"></i> Job Requirements (Optional)</h3>
+                    <p class="section-hint">Provide the target job description to enable job-specific analysis</p>
+                    <textarea id="job-requirements-input" 
+                              placeholder="Paste job description, title, required skills, seniority level, etc.&#10;&#10;Example:&#10;Senior Full Stack Engineer - React, Node.js, AWS&#10;5+ years experience&#10;Must know: TypeScript, PostgreSQL, Docker&#10;Nice to have: Kubernetes, Terraform"
+                              rows="8"></textarea>
+                    <div class="job-req-info">
+                        <span id="job-req-status">No job requirements provided</span>
+                        <button class="btn-secondary" id="clear-job-req" style="display:none;">Clear</button>
+                    </div>
+                </div>
+
                 <!-- Processing Logs -->
                 <div class="logs-container hidden" id="logs-container">
                     <div class="logs-header">
@@ -145,6 +158,30 @@
                     <div class="card factors-card">
                         <h3>Evaluation Factors</h3>
                         <ul id="ml-factors-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Job Fit Analysis (if job requirements provided) -->
+                <div id="job-fit-section" class="hidden-section" style="margin-top: 2rem;">
+                    <h3><i data-lucide="briefcase"></i> Job Requirements Analysis</h3>
+                    <div class="grid-2">
+                        <div class="card">
+                            <h4>Job Match Status</h4>
+                            <p id="job-hire-recommendation" style="font-size: 1.5rem; font-weight: bold; color: var(--accent);"></p>
+                            <p id="job-match-ratio"></p>
+                        </div>
+                        <div class="card">
+                            <h4>Skills Gap Analysis</h4>
+                            <p id="job-skills-summary"></p>
+                        </div>
+                    </div>
+                    <div class="card full-width">
+                        <h4>Missing Skills for This Role</h4>
+                        <div id="job-missing-skills" class="tags-list"></div>
+                    </div>
+                    <div class="card full-width">
+                        <h4>Matched Skills</h4>
+                        <div id="job-matched-skills" class="tags-list"></div>
                     </div>
                 </div>
                 

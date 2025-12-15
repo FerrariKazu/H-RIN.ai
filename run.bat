@@ -45,7 +45,7 @@ timeout /t 1 /nobreak >nul
 
 echo [4/4] Starting Backend API on port 8002...
 echo Using Python: !PYTHON_EXE!
-start "HR Buddy Backend" cmd /k "cd /d "%CD%" && !PYTHON_EXE! backend/main.py"
+start "HR Buddy Backend" cmd /k "cd /d "%CD%" && !PYTHON_EXE! -u backend/main.py"
 
 echo [5/5] Starting services...
 echo.
@@ -54,7 +54,7 @@ timeout /t 3 /nobreak
 
 if exist "frontend" (
     echo Starting Frontend on port 3000...
-    start "HR Buddy Frontend" cmd /k "cd /d "%CD%" && !PYTHON_EXE! -m http.server 3000 --directory frontend"
+    start "HR Buddy Frontend" cmd /k "cd /d "%CD%" && !PYTHON_EXE! -u -m http.server 3000 --directory frontend"
 )
 
 echo.

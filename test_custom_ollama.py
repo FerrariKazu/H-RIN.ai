@@ -26,22 +26,34 @@ def check_server():
             print(resp.text)
             
         # Try a simple generation
-        print("\nTesting generation with qwen2.5:7b-instruct-q4_K_M...")
+        print("\nTesting generation with qwen2.5:7b-instruct-q4_K_M...", flush=True)
         payload = {
             "model": "qwen2.5:7b-instruct-q4_K_M",
             "prompt": "Hi",
-            "stream": False
+            "stream": True
         }
-        resp = requests.post(f"{OLLAMA_HOST}/api/generate", json=payload)
+        resp = requests.post(f"{OLLAMA_HOST}/api/generate", json=payload, stream=True)
         if resp.status_code == 200:
-            print("[OK] Generation successful!")
-            print(resp.json().get('response', '')[:50])
+            print("[OK] Generation successful!", flush=True)
+            # Process streaming response
+            full_response = ""
+            for chunk in resp.iter_lines():
+                if chunk:
+                    try:
+                        line_data = json.loads(chunk)
+                        text_chunk = line_data.get("response", "")
+                        full_response += text_chunk
+                        print(text_chunk, end="", flush=True)
+                    except json.JSONDecodeError:
+                        continue
+            print("\n", flush=True)
+            print(f"Response preview: {full_response[:50]}", flush=True)
         else:
-            print(f"[ERR] Generation failed (Status {resp.status_code})")
-            print(resp.text)
+            print(f"[ERR] Generation failed (Status {resp.status_code})", flush=True)
+            print(resp.text, flush=True)
 
     except Exception as e:
-        print(f"[ERR] Connection error: {e}")
+        print(f"[ERR] Connection error: {e}", flush=True)
 
 if __name__ == "__main__":
     check_server()

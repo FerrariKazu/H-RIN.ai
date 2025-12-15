@@ -67,7 +67,8 @@ class LLMAnalyzer:
     def analyze(self, 
                resume_json: Dict,
                resume_markdown: str,
-               raw_text: str = "") -> Dict[str, Any]:
+               raw_text: str = "",
+               job_requirements: str = None) -> Dict[str, Any]:
         """
         Perform comprehensive LLM analysis
         
@@ -75,26 +76,28 @@ class LLMAnalyzer:
             resume_json: Structured resume data
             resume_markdown: Markdown version of resume
             raw_text: Original raw text
+            job_requirements: Optional job description to assess fit
         
         Returns:
             Analysis results with scoring and recommendations
         """
         self.logs = []
+        self.job_requirements = job_requirements
         
         # If no LLM available, provide heuristic analysis
         if not self.client:
             self._log("No LLM client available, using heuristic analysis")
-            return self._heuristic_analysis(resume_json)
+            return self._heuristic_analysis(resume_json, job_requirements)
         
         try:
             # Prepare prompt
-            prompt = self._build_analysis_prompt(resume_markdown)
+            prompt = self._build_analysis_prompt(resume_markdown, job_requirements)
             
             # Get analysis from LLM
             analysis_text = self._call_llm(prompt)
             
             # Parse response
-            analysis = self._parse_analysis(analysis_text, resume_json)
+            analysis = self._parse_analysis(analysis_text, resume_json, job_requirements)
             
             self._log("LLM analysis complete")
             return analysis
@@ -104,7 +107,7 @@ class LLMAnalyzer:
             return self._heuristic_analysis(resume_json)
     
     def _call_llm(self, prompt: str) -> str:
-        """Call LLM with prompt"""
+        """Call LLM with prompt using streaming for real-time output"""
         try:
             if self.provider == "openai":
                 response = self.client.chat.completions.create(
@@ -119,12 +122,23 @@ class LLMAnalyzer:
                 return response.choices[0].message.content
             
             elif self.provider == "ollama":
+                # Use streaming mode for unbuffered real-time output
                 response = self.client.generate(
                     model=self.model,
                     prompt=prompt,
-                    stream=False
+                    stream=True  # Enable streaming
                 )
-                return response['response']
+                
+                # Accumulate streamed response
+                full_response = ""
+                for chunk in response:
+                    if isinstance(chunk, dict):
+                        text_chunk = chunk.get('response', '')
+                        full_response += text_chunk
+                    else:
+                        full_response += str(chunk)
+                
+                return full_response
             
             else:
                 # Custom provider
@@ -135,12 +149,23 @@ class LLMAnalyzer:
             self._log(f"LLM call failed: {e}", "ERROR")
             raise
     
-    def _build_analysis_prompt(self, resume_markdown: str) -> str:
+    def _build_analysis_prompt(self, resume_markdown: str, job_requirements: str = None) -> str:
         """Build analysis prompt for LLM"""
+        
+        job_section = ""
+        if job_requirements:
+            job_section = f"""
+TARGET JOB REQUIREMENTS:
+{job_requirements}
+
+TASK: Evaluate the candidate's fit for THIS SPECIFIC JOB. Highlight gaps and alignment.
+"""
+        
         prompt = f"""
-Analyze the following resume and provide a comprehensive evaluation:
+Analyze the following resume{' relative to the job requirements' if job_requirements else ''}:
 
 {resume_markdown}
+{job_section}
 
 Please provide your analysis in the following JSON structure:
 {{
@@ -148,22 +173,25 @@ Please provide your analysis in the following JSON structure:
     "strengths": ["strength 1", "strength 2", ...],
     "weaknesses": ["weakness 1", "weakness 2", ...],
     "opportunities": ["opportunity 1", ...],
+    {"gap_analysis": {"required_skills": ["...", ], "missing_skills": ["...", ]}, " if job_requirements else ""}
     "technical_fit": {{"score": 0-100, "explanation": "..."}},
     "cultural_fit": {{"score": 0-100, "explanation": "..."}},
     "seniority_level": "junior|mid|senior|lead|executive",
     "recommended_roles": ["role 1", "role 2", ...],
     "missing_skills": ["skill 1", "skill 2", ...],
     "key_achievements": ["achievement 1", ...],
+    {"hire_recommendation": "YES|MAYBE|NO (relative to job)" if job_requirements else ""}
     "overall_score": 0-100,
     "key_metrics": {{"experience_years": X, "skills_count": Y, ...}}
 }}
 
-
-Be specific, data-driven, and constructive in your analysis.
+Be specific, data-driven, and constructive. {
+    'Focus on job-specific fit and explicitly explain why this candidate is suitable or not for the role.' if job_requirements else ''
+}
 """
         return prompt
     
-    def _parse_analysis(self, response_text: str, resume_json: Dict) -> Dict:
+    def _parse_analysis(self, response_text: str, resume_json: Dict, job_requirements: str = None) -> Dict:
         """Parse LLM response"""
         try:
             # Try to extract JSON from response
@@ -177,7 +205,7 @@ Be specific, data-driven, and constructive in your analysis.
                 json_str = response_text[start_idx:end_idx]
                 analysis = json.loads(json_str)
             else:
-                analysis = self._heuristic_analysis(resume_json)
+                analysis = self._heuristic_analysis(resume_json, job_requirements)
             
             analysis["logs"] = self.logs
             analysis["success"] = True
@@ -185,12 +213,13 @@ Be specific, data-driven, and constructive in your analysis.
         
         except Exception as e:
             self._log(f"Failed to parse LLM response: {e}", "WARNING")
-            return self._heuristic_analysis(resume_json)
+            return self._heuristic_analysis(resume_json, job_requirements)
     
-    def _heuristic_analysis(self, resume_json: Dict) -> Dict:
+    def _heuristic_analysis(self, resume_json: Dict, job_requirements: str = None) -> Dict:
         """
         Provide heuristic analysis when LLM is unavailable
         NO mock data - based on actual resume content
+        Optionally compares to job requirements if provided
         """
         # Count actual data
         skills_count = len(resume_json.get("skills", []))
@@ -283,6 +312,19 @@ Be specific, data-driven, and constructive in your analysis.
             "analysis_type": "heuristic"
         }
         
+        # Add job requirements analysis if provided
+        if job_requirements:
+            analysis["gap_analysis"] = self._analyze_job_fit(
+                resume_json, 
+                job_requirements, 
+                skill_categories
+            )
+            analysis["hire_recommendation"] = self._make_hire_recommendation(
+                analysis["gap_analysis"],
+                overall_score
+            )
+            self._log(f"Job-specific analysis: {analysis['hire_recommendation']}")
+        
         self._log(f"Heuristic analysis: score {overall_score}/100, seniority {seniority}")
         
         return analysis
@@ -336,6 +378,69 @@ Be specific, data-driven, and constructive in your analysis.
                 missing.append("AWS/Azure/GCP")
         
         return missing
+    
+    def _analyze_job_fit(self, resume_json: Dict, job_requirements: str, skill_categories: Dict) -> Dict:
+        """
+        Analyze how well the resume matches job requirements
+        Returns gap analysis with required vs missing skills
+        """
+        resume_skills = set(s.lower() if isinstance(s, str) else s.get("name", "").lower() 
+                           for s in resume_json.get("skills", []))
+        
+        # Parse job requirements to extract common keywords (simple heuristic)
+        job_lower = job_requirements.lower()
+        
+        # Common tech skills and roles
+        common_skills = {
+            "python", "javascript", "java", "csharp", "c#", "c++", "golang", "rust", "typescript",
+            "react", "angular", "vue", "nodejs", "node.js", "express", "django", "flask",
+            "aws", "azure", "gcp", "docker", "kubernetes", "jenkins", "cicd",
+            "sql", "mysql", "postgresql", "mongodb", "dynamodb",
+            "git", "linux", "unix", "windows", "macos",
+            "agile", "scrum", "devops", "microservices",
+            "api", "rest", "graphql", "websocket",
+            "machine learning", "ml", "ai", "tensorflow", "pytorch",
+            "html", "css", "sass", "webpack", "npm", "yarn"
+        }
+        
+        required_skills = set()
+        for skill in common_skills:
+            if skill in job_lower:
+                required_skills.add(skill.replace("c#", "csharp"))
+        
+        # Find missing skills
+        missing_skills = required_skills - resume_skills
+        matched_skills = required_skills & resume_skills
+        
+        # Extract requirements analysis
+        years_req = "3" if "3+" in job_requirements or "3 years" in job_lower else "not specified"
+        seniority_keywords = ["junior", "mid", "senior", "lead", "principal", "staff"]
+        role_seniority = next((kw for kw in seniority_keywords if kw in job_lower), "not specified")
+        
+        return {
+            "required_skills": list(required_skills),
+            "matched_skills": list(matched_skills),
+            "missing_skills": list(missing_skills),
+            "skills_match_ratio": round(len(matched_skills) / len(required_skills) * 100, 1) if required_skills else 0,
+            "required_experience": f"{years_req} years",
+            "role_seniority": role_seniority,
+            "analysis": f"Matched {len(matched_skills)}/{len(required_skills)} required skills"
+        }
+    
+    def _make_hire_recommendation(self, gap_analysis: Dict, base_score: int) -> str:
+        """
+        Make a hire/no-hire recommendation based on gap analysis and score
+        """
+        match_ratio = gap_analysis.get("skills_match_ratio", 0)
+        missing_count = len(gap_analysis.get("missing_skills", []))
+        
+        # Decision logic
+        if match_ratio >= 80 and base_score >= 75:
+            return "YES"
+        elif match_ratio >= 60 and base_score >= 60:
+            return "MAYBE"
+        else:
+            return "NO"
     
     def _log(self, message: str, level: str = "INFO"):
         """Add to logs"""

@@ -5,7 +5,8 @@ let API_URL = window.VITE_API_URL || "http://localhost:8002";
 const state = {
     file: null,
     logs: [],
-    extractedData: null
+    extractedData: null,
+    jobRequirements: null
 };
 
 // Initialize when DOM is ready
@@ -17,6 +18,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const logsOutput = document.getElementById('logs-output');
     const navBtns = document.querySelectorAll('.nav-btn');
     const sections = document.querySelectorAll('main section');
+    const jobReqInput = document.getElementById('job-requirements-input');
+    const jobReqStatus = document.getElementById('job-req-status');
+    const clearJobReqBtn = document.getElementById('clear-job-req');
 
     // Check if elements exist
     if (!dropZone || !fileInput) {
@@ -69,6 +73,27 @@ document.addEventListener('DOMContentLoaded', function() {
     dropZone.addEventListener('drop', handleDrop, false);
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files), false);
 
+    // Job Requirements Handlers
+    jobReqInput.addEventListener('input', () => {
+        const value = jobReqInput.value.trim();
+        if (value) {
+            state.jobRequirements = value;
+            jobReqStatus.textContent = `✓ Job requirements loaded (${value.split(' ').length} words)`;
+            clearJobReqBtn.style.display = 'block';
+        } else {
+            state.jobRequirements = null;
+            jobReqStatus.textContent = 'No job requirements provided';
+            clearJobReqBtn.style.display = 'none';
+        }
+    });
+
+    clearJobReqBtn.addEventListener('click', () => {
+        jobReqInput.value = '';
+        state.jobRequirements = null;
+        jobReqStatus.textContent = 'No job requirements provided';
+        clearJobReqBtn.style.display = 'none';
+    });
+
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
@@ -101,40 +126,62 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('enable_llm_analysis', 'true');
 
         try {
-            // Complete end-to-end processing
-            addLog("📤 Sending PDF to backend pipeline...");
-            const processUrl = `${API_URL}/process`;
-            console.log("Final request URL:", processUrl);
-            console.log("Request method: POST");
-            console.log("Request body: FormData with file and enable_llm_analysis");
+            // Step 1: Upload & PDF Extraction
+            addLog("📤 Sending PDF to backend...");
+            const uploadUrl = `${API_URL}/upload`;
+            console.log("Upload request URL:", uploadUrl);
             
-            const processRes = await fetch(processUrl, {
+            const uploadRes = await fetch(uploadUrl, {
                 method: 'POST',
                 body: formData
-                // Note: Do NOT set Content-Type manually - browser handles multipart/form-data
             });
             
-            if (!processRes.ok) {
-                const errorText = await processRes.text();
-                throw new Error(`Processing failed with status ${processRes.status}: ${errorText}`);
+            if (!uploadRes.ok) {
+                const errorText = await uploadRes.text();
+                throw new Error(`Upload failed with status ${uploadRes.status}: ${errorText}`);
             }
-            const result = await processRes.json();
-            addLog(`✅ Text extracted. Length: ${result.raw_text.length} chars.`);
-            addLog(`📄 Document type: ${result.document_type}`);
-            addLog(`🔍 Confidence: ${(result.extraction_confidence * 100).toFixed(1)}%`);
-            addLog(`📊 Found ${result.resume_json.skills ? result.resume_json.skills.length : 0} skills`);
-            addLog(`🤖 LLM Analysis: ${result.llm_analysis ? 'Complete' : 'Skipped'}`);
+            const uploadResult = await uploadRes.json();
+            addLog(`✅ Text extracted. Length: ${uploadResult.raw_text.length} chars.`);
+            addLog(`📄 Document type: ${uploadResult.document_type}`);
+            addLog(`🔍 Confidence: ${(uploadResult.confidence * 100).toFixed(1)}%`);
+
+            // Step 2: Analysis with job requirements
+            addLog("🧠 Running analysis pipeline...");
+            if (state.jobRequirements) {
+                addLog(`📋 Using job requirements (${state.jobRequirements.split(' ').length} words)`);
+            }
+            
+            const analyzeRes = await fetch(`${API_URL}/analyze`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filename: file.name,
+                    extracted_text: uploadResult.raw_text,
+                    enable_llm_analysis: true,
+                    job_requirements: state.jobRequirements || null
+                })
+            });
+            
+            if (!analyzeRes.ok) {
+                const errorText = await analyzeRes.text();
+                throw new Error(`Analysis failed with status ${analyzeRes.status}: ${errorText}`);
+            }
+            const analyzeResult = await analyzeRes.json();
+            
+            addLog(`✅ Analysis complete`);
+            if (analyzeResult.llm_analysis) {
+                addLog(`📊 LLM Score: ${analyzeResult.llm_analysis.ai_score || 'N/A'}/100`);
+            }
             
             // Finalize
             state.extractedData = {
-                upload: result,
-                nlp: result.resume_json,
-                struct: result.resume_json,
-                ml: result.llm_analysis || {},
-                report: { html: result.resume_markdown }
+                upload: uploadResult,
+                nlp: analyzeResult.resume_json || {},
+                struct: analyzeResult.resume_json || {},
+                ml: analyzeResult.llm_analysis || {},
+                report: { html: analyzeResult.resume_markdown }
             };
             
             renderResults();
@@ -225,11 +272,63 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Latest Company:</strong> ${experience[0]?.company || "N/A"}</p>
         `;
         
-        // AI Summary (from markdown)
+        // AI Summary (from markdown) - Make it more detailed
         const aiSummaryEl = document.getElementById('ai-summary');
-        if (data.ml && data.ml.executive_summary) {
-            // Use LLM analysis executive summary if available
-            aiSummaryEl.innerHTML = `<h1>Resume Analysis</h1><p>${data.ml.executive_summary}</p>`;
+        if (data.ml && Object.keys(data.ml).length > 0) {
+            // Build comprehensive assessment from LLM data
+            let assessmentHTML = '<h1>AI Executive Assessment</h1>';
+            
+            // Executive Summary
+            if (data.ml.executive_summary) {
+                assessmentHTML += `<h2>Executive Summary</h2><p>${data.ml.executive_summary}</p>`;
+            }
+            
+            // Seniority and Recommended Roles
+            if (data.ml.seniority_level || data.ml.recommended_roles) {
+                assessmentHTML += '<h2>Professional Profile</h2>';
+                if (data.ml.seniority_level) {
+                    assessmentHTML += `<p><strong>Seniority Level:</strong> ${data.ml.seniority_level}</p>`;
+                }
+                if (data.ml.recommended_roles && Array.isArray(data.ml.recommended_roles)) {
+                    assessmentHTML += `<p><strong>Recommended Roles:</strong> ${data.ml.recommended_roles.join(', ')}</p>`;
+                }
+            }
+            
+            // Technical and Cultural Fit
+            if (data.ml.technical_fit || data.ml.cultural_fit) {
+                assessmentHTML += '<h2>Fit Analysis</h2>';
+                if (data.ml.technical_fit) {
+                    const techScore = data.ml.technical_fit.score || 0;
+                    const techExplanation = data.ml.technical_fit.explanation || '';
+                    assessmentHTML += `<p><strong>Technical Fit:</strong> ${techScore}/100 - ${techExplanation}</p>`;
+                }
+                if (data.ml.cultural_fit) {
+                    const cultScore = data.ml.cultural_fit.score || 0;
+                    const cultExplanation = data.ml.cultural_fit.explanation || '';
+                    assessmentHTML += `<p><strong>Cultural Fit:</strong> ${cultScore}/100 - ${cultExplanation}</p>`;
+                }
+            }
+            
+            // Key Achievements
+            if (data.ml.key_achievements && Array.isArray(data.ml.key_achievements)) {
+                assessmentHTML += '<h2>Key Achievements</h2><ul>';
+                data.ml.key_achievements.forEach(achievement => {
+                    assessmentHTML += `<li>${achievement}</li>`;
+                });
+                assessmentHTML += '</ul>';
+            }
+            
+            // Key Metrics
+            if (data.ml.key_metrics) {
+                assessmentHTML += '<h2>Key Metrics</h2><ul>';
+                Object.entries(data.ml.key_metrics).forEach(([key, value]) => {
+                    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    assessmentHTML += `<li><strong>${formattedKey}:</strong> ${value}</li>`;
+                });
+                assessmentHTML += '</ul>';
+            }
+            
+            aiSummaryEl.innerHTML = assessmentHTML;
         } else if (data.report.html || data.upload.resume_markdown) {
             aiSummaryEl.innerHTML = data.report.html || data.upload.resume_markdown;
         } else if (resume.summary) {
@@ -295,10 +394,20 @@ document.addEventListener('DOMContentLoaded', function() {
             scoreElement.textContent = Math.round(score);
         }
         
-        // Factors/Summary
+        // Factors/Summary - Expanded with positive and negative factors in separate divs
         const factorsList = document.getElementById('ml-factors-list');
         if (factorsList) {
             factorsList.innerHTML = '';
+            
+            // Positive Factors Section
+            const positiveDiv = document.createElement('div');
+            positiveDiv.style.marginBottom = '1rem';
+            
+            const positiveTitle = document.createElement('h4');
+            positiveTitle.textContent = 'Strengths & Positive Factors';
+            positiveTitle.style.color = 'var(--success)';
+            positiveTitle.style.marginBottom = '0.5rem';
+            positiveDiv.appendChild(positiveTitle);
             
             // Show strengths from LLM analysis
             if (mlData.strengths && Array.isArray(mlData.strengths)) {
@@ -306,12 +415,57 @@ document.addEventListener('DOMContentLoaded', function() {
                     const li = document.createElement('li');
                     li.textContent = `✓ ${strength}`;
                     li.style.color = "var(--success)";
-                    factorsList.appendChild(li);
+                    positiveDiv.appendChild(li);
                 });
             }
             
-            // Fallback to summary
-            if (factorsList.children.length === 0) {
+            // Show opportunities
+            if (mlData.opportunities && Array.isArray(mlData.opportunities)) {
+                mlData.opportunities.forEach(opportunity => {
+                    const li = document.createElement('li');
+                    li.textContent = `⭐ ${opportunity}`;
+                    li.style.color = "var(--accent)";
+                    positiveDiv.appendChild(li);
+                });
+            }
+            
+            factorsList.appendChild(positiveDiv);
+            
+            // Negative Factors Section
+            const negativeDiv = document.createElement('div');
+            negativeDiv.style.marginTop = '1rem';
+            
+            const negativeTitle = document.createElement('h4');
+            negativeTitle.textContent = 'Weaknesses & Areas for Improvement';
+            negativeTitle.style.color = 'var(--error)';
+            negativeTitle.style.marginBottom = '0.5rem';
+            negativeDiv.appendChild(negativeTitle);
+            
+            // Show weaknesses
+            if (mlData.weaknesses && Array.isArray(mlData.weaknesses)) {
+                mlData.weaknesses.forEach(weakness => {
+                    const li = document.createElement('li');
+                    li.textContent = `✗ ${weakness}`;
+                    li.style.color = "var(--error)";
+                    negativeDiv.appendChild(li);
+                });
+            }
+            
+            // Show missing skills
+            if (mlData.missing_skills && Array.isArray(mlData.missing_skills)) {
+                mlData.missing_skills.forEach(skill => {
+                    const li = document.createElement('li');
+                    li.textContent = `⚠ Missing: ${skill}`;
+                    li.style.color = "rgba(239, 69, 101, 0.8)";
+                    negativeDiv.appendChild(li);
+                });
+            }
+            
+            factorsList.appendChild(negativeDiv);
+            
+            // Fallback to summary if no factors
+            if (positiveDiv.children.length === 1 && negativeDiv.children.length === 1) {
+                factorsList.innerHTML = '';
                 const summary = mlData.summary || mlData.ai_summary || "Analysis complete";
                 if (typeof summary === 'string') {
                     const li = document.createElement('li');
@@ -333,6 +487,79 @@ document.addEventListener('DOMContentLoaded', function() {
         const jsonDisplay = document.getElementById('json-display');
         if (jsonDisplay) {
             jsonDisplay.textContent = JSON.stringify(resume, null, 2);
+        }
+
+        // 5. Job Fit Analysis (if available)
+        const jobFitSection = document.getElementById('job-fit-section');
+        if (jobFitSection && mlData.gap_analysis) {
+            jobFitSection.style.display = 'block';
+            
+            // Hire recommendation
+            const recommendation = mlData.hire_recommendation || "NO";
+            const recElement = document.getElementById('job-hire-recommendation');
+            if (recElement) {
+                recElement.textContent = recommendation;
+                recElement.style.color = recommendation === "YES" ? "var(--success)" : 
+                                        recommendation === "MAYBE" ? "var(--accent)" : "var(--error)";
+            }
+            
+            // Match ratio
+            const matchRatio = mlData.gap_analysis.skills_match_ratio || 0;
+            const matchElement = document.getElementById('job-match-ratio');
+            if (matchElement) {
+                matchElement.textContent = `${matchRatio}% skill match (${mlData.gap_analysis.matched_skills?.length || 0}/${mlData.gap_analysis.required_skills?.length || 0})`;
+            }
+            
+            // Skills summary
+            const skillsSummaryElement = document.getElementById('job-skills-summary');
+            if (skillsSummaryElement) {
+                const analysis = mlData.gap_analysis.analysis || "";
+                skillsSummaryElement.innerHTML = `
+                    <p>${analysis}</p>
+                    <p style="margin-top: 0.5rem; color: var(--text-secondary);">
+                        Seniority Required: ${mlData.gap_analysis.role_seniority}<br/>
+                        Experience Required: ${mlData.gap_analysis.required_experience}
+                    </p>
+                `;
+            }
+            
+            // Missing skills
+            const missingSkillsElement = document.getElementById('job-missing-skills');
+            if (missingSkillsElement) {
+                missingSkillsElement.innerHTML = '';
+                const missing = mlData.gap_analysis.missing_skills || [];
+                if (missing.length > 0) {
+                    missing.forEach(skill => {
+                        const span = document.createElement('span');
+                        span.className = 'skill-tag';
+                        span.style.backgroundColor = 'rgba(239, 69, 101, 0.2)';
+                        span.style.color = 'var(--error)';
+                        span.textContent = '✗ ' + skill;
+                        missingSkillsElement.appendChild(span);
+                    });
+                } else {
+                    missingSkillsElement.innerHTML = '<p style="color: var(--success);">All required skills matched!</p>';
+                }
+            }
+            
+            // Matched skills
+            const matchedSkillsElement = document.getElementById('job-matched-skills');
+            if (matchedSkillsElement) {
+                matchedSkillsElement.innerHTML = '';
+                const matched = mlData.gap_analysis.matched_skills || [];
+                if (matched.length > 0) {
+                    matched.forEach(skill => {
+                        const span = document.createElement('span');
+                        span.className = 'skill-tag';
+                        span.style.backgroundColor = 'rgba(61, 169, 250, 0.2)';
+                        span.style.color = 'var(--success)';
+                        span.textContent = '✓ ' + skill;
+                        matchedSkillsElement.appendChild(span);
+                    });
+                }
+            }
+        } else if (jobFitSection) {
+            jobFitSection.style.display = 'none';
         }
     }
 

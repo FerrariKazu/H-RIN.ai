@@ -2,6 +2,7 @@ import json
 import re
 import requests
 import os
+import sys
 from typing import Dict, Any, Optional
 
 # Configuration for Ollama
@@ -51,6 +52,7 @@ class LLMStructuredExtractor:
     def extract(self, resume_text: str, nlp_data: Dict[str, Any], model: Optional[str] = None) -> Dict[str, Any]:
         """
         Sends the resume text and NLP-extracted data to the LLM and returns structured JSON data.
+        Uses streaming mode for real-time output and unbuffered processing.
         """
         target_model = model or self.default_model
         template = self.load_template("resume_to_json_prompt")
@@ -63,22 +65,45 @@ class LLMStructuredExtractor:
         payload = {
             "model": target_model,
             "prompt": prompt,
-            "stream": False,
+            "stream": True,  # Enable streaming
             "format": "json"
         }
         
         try:
-            response = requests.post(OLLAMA_URL, json=payload)
+            print(f"[LLM] Connecting to {OLLAMA_URL} with model {target_model}...", flush=True)
+            
+            response = requests.post(OLLAMA_URL, json=payload, stream=True)
             response.raise_for_status()
             
-            result = response.json()
-            generated_text = result.get("response", "")
+            # Accumulate streamed response
+            full_response = ""
             
-            return self.clean_json_response(generated_text)
+            print(f"[LLM] Streaming response from Ollama...", flush=True)
+            for chunk in response.iter_lines():
+                if chunk:
+                    try:
+                        # Each line is a JSON object with a "response" field
+                        line_data = json.loads(chunk)
+                        text_chunk = line_data.get("response", "")
+                        full_response += text_chunk
+                        
+                        # Flush unbuffered output
+                        print(text_chunk, end="", flush=True)
+                        sys.stdout.flush()
+                        
+                    except json.JSONDecodeError:
+                        # Skip malformed lines
+                        continue
+            
+            print()  # Newline after streaming
+            print(f"[LLM] Stream complete. Processing response...", flush=True)
+            
+            # Parse the accumulated response
+            return self.clean_json_response(full_response)
             
         except requests.exceptions.RequestException as e:
-            print(f"DEBUG: Connection error to {OLLAMA_URL}: {e}")
+            print(f"[ERROR] Connection error to {OLLAMA_URL}: {e}", flush=True)
             raise ConnectionError(f"Failed to connect to LLM at {OLLAMA_URL}: {str(e)}")
         except Exception as e:
-            print(f"DEBUG: General error in extract: {e}")
+            print(f"[ERROR] General error in extract: {e}", flush=True)
             raise ValueError(f"Error during extraction: {str(e)}")

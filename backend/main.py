@@ -165,6 +165,7 @@ class AnalyzeRequest(BaseModel):
     filename: str = "resume"
     extracted_text: str
     enable_llm_analysis: bool = True
+    job_requirements: Optional[str] = None
 
 class AnalyzeResponse(BaseModel):
     """Analyze response model"""
@@ -348,10 +349,15 @@ async def analyze_resume(request: AnalyzeRequest):
         if request.enable_llm_analysis:
             logger.info("Step 3: LLM analysis...")
             try:
+                # Log if job requirements provided
+                if request.job_requirements:
+                    logger.info(f"Job requirements provided ({len(request.job_requirements)} chars)")
+                
                 llm_analysis = llm_analyzer.analyze(
                     resume_json=resume_json,
                     resume_markdown=resume_markdown,
-                    raw_text=request.extracted_text
+                    raw_text=request.extracted_text,
+                    job_requirements=request.job_requirements
                 )
                 all_logs.extend(llm_analysis.get("logs", []))
             except Exception as e:
