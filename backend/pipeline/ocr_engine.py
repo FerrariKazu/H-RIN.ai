@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Configure Tesseract path if needed (Windows often needs this)
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class OCREngine:
     def __init__(self):

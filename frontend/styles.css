@@ -74,6 +74,13 @@ body {
     color: var(--text-primary);
 }
 
+.logo .logo-text {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+
 .sidebar nav {
     display: flex;
     flex-direction: column;
@@ -195,7 +202,7 @@ section {
 /* Log Console */
 .logs-container {
     margin-top: 2rem;
-    background: #000;
+    background: rgba(0, 0, 0, 0.55);
     border: 1px solid var(--border);
     border-radius: 8px;
     font-family: 'JetBrains Mono', monospace;
@@ -221,6 +228,7 @@ section {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    background: rgba(0, 0, 0, 0.25);
 }
 
 .log-entry { margin-bottom: 2px; }

@@ -101,7 +101,10 @@ async function uploadFile(file) {
             body: formData
         });
         
-        if (!uploadRes.ok) throw new Error("Upload failed");
+        if (!uploadRes.ok) {
+            const errorText = await uploadRes.text();
+            throw new Error(`Upload failed with status ${uploadRes.status}: ${errorText}`);
+        }
         const uploadData = await uploadRes.json();
         addLog(`✅ Text extracted. Length: ${uploadData.extracted_text.length} chars.`);
         addLog(`📄 Document type: ${uploadData.document_type || 'Detector Pending'}`);
