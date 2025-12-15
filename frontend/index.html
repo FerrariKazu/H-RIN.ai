@@ -1,12 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HR Buddy AI - Production</title>
-  </head>
-  <body class="bg-gray-100 text-gray-800">
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Buddy - Advanced Resume Analysis</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+    
+    <!-- 3D Background -->
+    <canvas id="bg-canvas"></canvas>
+    <div class="bg-overlay"></div>
+
+    <!-- Main App Container -->
+    <div id="app">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="brain-circuit"></i>
+                <span>HR Buddy</span>
+            </div>
+            
+            <nav>
+                <button class="nav-btn active" data-section="upload-section">
+                    <i data-lucide="upload-cloud"></i> Upload
+                </button>
+                <button class="nav-btn" data-section="summary-section" disabled>
+                    <i data-lucide="file-text"></i> Summary
+                </button>
+                <button class="nav-btn" data-section="skills-section" disabled>
+                    <i data-lucide="award"></i> Skills & NLP
+                </button>
+                <button class="nav-btn" data-section="analysis-section" disabled>
+                    <i data-lucide="bar-chart-2"></i> ML Analysis
+                </button>
+                <button class="nav-btn" data-section="json-section" disabled>
+                    <i data-lucide="code"></i> Raw JSON
+                </button>
+            </nav>
+
+            <div class="status-box" id="global-status">
+                <div class="status-indicator"></div>
+                <span id="status-text">System Ready</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content">
+            
+            <!-- Section: Upload -->
+            <section id="upload-section" class="active-section">
+                <div class="hero-text">
+                    <h1>AI-Powered Resume Ecosystem</h1>
+                    <p>Production-grade extraction pipeline. No mocks. Pure data.</p>
+                </div>
+
+                <div class="upload-area" id="drop-zone">
+                    <i data-lucide="file-up" class="upload-icon"></i>
+                    <h3>Drag & Drop Resume PDF</h3>
+                    <p>or click to browse</p>
+                    <input type="file" id="file-input" accept=".pdf" hidden>
+                </div>
+
+                <!-- Processing Logs -->
+                <div class="logs-container hidden" id="logs-container">
+                    <div class="logs-header">
+                        <i data-lucide="terminal-square"></i> Live Pipeline Logs
+                    </div>
+                    <div class="logs-content" id="logs-output">
+                        <!-- Logs injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: Summary -->
+            <section id="summary-section" class="hidden-section">
+                <header class="section-header">
+                    <h2>Executive Summary</h2>
+                    <div class="badges" id="header-badges"></div>
+                </header>
+                
+                <div class="grid-2">
+                    <div class="card">
+                        <h3><i data-lucide="user"></i> Candidate Profile</h3>
+                        <div id="profile-content" class="content-text"></div>
+                    </div>
+                    <div class="card">
+                        <h3><i data-lucide="briefcase"></i> Experience Summary</h3>
+                        <div id="experience-summary" class="content-text"></div>
+                    </div>
+                </div>
+
+                <div class="card full-width">
+                    <h3><i data-lucide="sparkles"></i> AI Executive Assessment</h3>
+                    <div id="ai-summary" class="markdown-body"></div>
+                </div>
+            </section>
+
+            <!-- Section: Skills & NLP -->
+            <section id="skills-section" class="hidden-section">
+                <h2>Skills & Entities</h2>
+                <div id="skills-cloud" class="skills-wrapper"></div>
+                
+                <h3>Named Entities (NER)</h3>
+                <div class="table-container">
+                    <table id="entities-table">
+                        <thead>
+                            <tr><th>Entity</th><th>Label</th><th>Confidence</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Section: ML Analysis -->
+            <section id="analysis-section" class="hidden-section">
+                <h2>Machine Learning Evaluation</h2>
+                <div class="score-card-container">
+                    <div class="score-card">
+                        <div class="score-circle" id="ai-score-circle">--</div>
+                        <span>AI Fit Score</span>
+                    </div>
+                    <div class="card factors-card">
+                        <h3>Evaluation Factors</h3>
+                        <ul id="ml-factors-list"></ul>
+                    </div>
+                </div>
+                
+                <h3>Recommended Roles</h3>
+                <div id="roles-list" class="tags-list"></div>
+            </section>
+
+            <!-- Section: JSON -->
+            <section id="json-section" class="hidden-section">
+                <h2>Raw Reconstruction</h2>
+                <pre id="json-display" class="code-block"></pre>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/three-bg.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
 </html>

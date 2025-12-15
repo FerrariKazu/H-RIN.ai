@@ -1,18 +1,15 @@
 [build]
-  command = "npm run build"
-  publish = "dist"
+  publish = "."
+  command = "echo 'Static Site'"
 
 [[redirects]]
-# API Redirects (Proxy to Ngrok/Production Backend)
-# The frontend code uses import.meta.env.VITE_API_URL which we will set in Netlify.
-# This redirect is a fallback if relative paths were used.
-  from = "/api/*"
-  to = ":splat"
-  status = 200
-  force = true
-
-# SPA Fallback
-  [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Optional: If you want to proxy API requests like we did before
+[[redirects]]
+  from = "/api/*"
+  to = "http://localhost:8001/:splat"
+  status = 200
+  force = true

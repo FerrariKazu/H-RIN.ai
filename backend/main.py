@@ -12,8 +12,13 @@ import logging
 # Allow importing from root directory (agent, etc.)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import our agents
-from agent.extractors.nlp_entity_extractor import EntityExtractor
+# Import Pipeline Engines
+from backend.pipeline.pdf_parser import PDFParser
+from backend.pipeline.ocr_engine import OCREngine
+from backend.pipeline.nlp_engine import NLPEngine
+from backend.pipeline.layout_engine import LayoutEngine
+
+# Import existing agents (keeping for ML/LLM logic)
 from agent.extractors.llm_structured_extractor import LLMStructuredExtractor
 from agent.ml.evaluator import MLEvaluator
 from agent.reporting.hr_report_generator import HRReportGenerator
@@ -22,20 +27,24 @@ from agent.reporting.hr_report_generator import HRReportGenerator
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HR_Buddy_Backend")
 
-app = FastAPI(title="HR Buddy API", version="2.0")
+app = FastAPI(title="HR Buddy API", version="3.0 - Production")
 
-# Configure CORS for Production (Ngrok & Vite)
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    # Allow all for Ngrok/Netlify flexibility during dev
     allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Initialize Pipeline
+pdf_parser = PDFParser()
+ocr_engine = OCREngine()
+nlp_engine = NLPEngine()
+layout_engine = LayoutEngine()
+
 # Initialize Agents
-nlp_extractor = EntityExtractor()
 llm_extractor = LLMStructuredExtractor()
 ml_evaluator = MLEvaluator()
 report_generator = HRReportGenerator()
@@ -46,21 +55,21 @@ class NLPRequest(BaseModel):
 
 class StructureRequest(BaseModel):
     text: str
-    nlp_data: Dict[str, Any]
-    model: Optional[str] = "qwen2.5:7b-instruct-q4_K_M"
+    nlp_data: Dict
+    model: Optional[str] = "qwen3:14b-q4_K_M"
 
 class EvaluationRequest(BaseModel):
     text: str
-    structured_data: Dict[str, Any]
+    structured_data: Dict
 
 class ReportRequest(BaseModel):
-    structured_data: Dict[str, Any]
-    ml_result: Dict[str, Any]
-    model: Optional[str] = "qwen2.5:7b-instruct-q4_K_M"
+    structured_data: Dict
+    ml_result: Dict
+    model: Optional[str] = "qwen3:14b-q4_K_M"
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "2.0"}
+    return {"status": "ok", "version": "3.0", "pipeline": "active"}
 
 @app.post("/upload_cv")
 async def upload_cv(file: UploadFile = File(...)):
@@ -70,48 +79,49 @@ async def upload_cv(file: UploadFile = File(...)):
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        import fitz
+        # 1. Pipeline: PDF Parse
+        extract_result = pdf_parser.process(temp_path)
         
-        doc = fitz.open(temp_path)
-        text = ""
+        final_text = extract_result["text"]
+        layout_info = []
         
-        # Check for OCR need
-        import pytesseract
-        from PIL import Image
-        import io
-
-        for page in doc:
-            page_text = page.get_text()
+        # 2. Pipeline: OCR / Layout / Hybrid
+        if extract_result.get("needs_ocr", False):
+            logger.info("Triggering OCR Pipeline")
+            ocr_text = ""
+            for img_bytes in extract_result.get("images", []):
+                # Preprocess & OCR
+                ocr_res = ocr_engine.process_image(img_bytes)
+                ocr_text += ocr_res["text"] + "\n"
+                
+                # Layout Analysis (on the first page or all)
+                # Just analyzing first page for layout signature to save time
+                if not layout_info:
+                    layout_info = layout_engine.analyze(img_bytes)
             
-            # Fallback to OCR if text is sparse (scanned PDF)
-            if not page_text.strip() or len(page_text.strip()) < 50:
-                logger.info(f"Page {page.number} seems likely scanned. Attempting OCR...")
-                try:
-                    pix = page.get_pixmap()
-                    img_data = pix.tobytes("png")
-                    image = Image.open(io.BytesIO(img_data))
-                    ocr_text = pytesseract.image_to_string(image)
-                    text += ocr_text + "\n"
-                except Exception as ocr_err:
-                    logger.warning(f"OCR failed for page {page.number}: {ocr_err}")
-                    # Fallback to whatever text might be there
-                    text += page_text
-            else:
-                text += page_text
-
-        doc.close()
-        os.remove(temp_path)
+            final_text = ocr_text if len(ocr_text) > len(final_text) else final_text
         
-        return {"filename": file.filename, "extracted_text": text}
+        # Cleanup
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        return {
+            "filename": file.filename,
+            "extracted_text": final_text,
+            "document_type": "Scanned/Hybrid" if extract_result.get("needs_ocr") else "Digital Native",
+            "meta": extract_result.get("meta", {}),
+            "layout_summary": str(layout_info)[:200] # Truncate for sanity
+        }
     except Exception as e:
-        logger.error(f"Upload failed: {e}")
+        logger.error(f"Upload pipeline failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/nlp_extract")
 async def nlp_extract_endpoint(req: NLPRequest):
     try:
-        entities = nlp_extractor.extract_entities(req.text)
-        return {"entities": entities}
+        # Use new generic NLP Engine
+        data = nlp_engine.extract(req.text)
+        return data # returns {"entities": ...}
     except Exception as e:
         logger.error(f"NLP failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -128,7 +138,6 @@ async def extract_structured_endpoint(req: StructureRequest):
 @app.post("/evaluate")
 async def evaluate_endpoint(req: EvaluationRequest):
     try:
-        # result includes predicted_ai_score, hire_probability, etc.
         result = ml_evaluator.evaluate(req.text, req.structured_data)
         return result
     except Exception as e:
@@ -143,39 +152,6 @@ async def generate_report_endpoint(req: ReportRequest):
     except Exception as e:
         logger.error(f"Report generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/process_full_pipeline")
-async def process_full_pipeline(file: UploadFile = File(...)):
-    """
-    Combined endpoint for robustness if needed.
-    """
-    # 1. Upload & Text
-    upload_res = await upload_cv(file)
-    text = upload_res["extracted_text"]
-    
-    # 2. NLP
-    nlp_res = await nlp_extract_endpoint(NLPRequest(text=text))
-    nlp_data = nlp_res["entities"]
-    
-    # 3. LLM
-    struct_req = StructureRequest(text=text, nlp_data=nlp_data)
-    structured_data = await extract_structured_endpoint(struct_req)
-    
-    # 4. ML
-    eval_req = EvaluationRequest(text=text, structured_data=structured_data)
-    ml_result = await evaluate_endpoint(eval_req)
-    
-    # 5. Report
-    report_req = ReportRequest(structured_data=structured_data, ml_result=ml_result)
-    report_res = await generate_report_endpoint(report_req)
-    
-    return {
-        "text": text,
-        "nlp": nlp_data,
-        "structured": structured_data,
-        "ml": ml_result,
-        "report": report_res["html"]
-    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
