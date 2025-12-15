@@ -330,8 +330,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.ml.seniority_level) {
                     assessmentHTML += `<p><strong>Seniority Level:</strong> ${data.ml.seniority_level}</p>`;
                 }
+                
+                // Display detailed role recommendations with icons
                 if (data.ml.recommended_roles && Array.isArray(data.ml.recommended_roles)) {
-                    assessmentHTML += `<p><strong>Recommended Roles:</strong> ${data.ml.recommended_roles.join(', ')}</p>`;
+                    assessmentHTML += '<h3>Recommended Roles</h3>';
+                    
+                    // Check if roles are detailed objects or simple strings
+                    const firstRole = data.ml.recommended_roles[0];
+                    if (firstRole && typeof firstRole === 'object' && firstRole.title) {
+                        // Detailed role objects with icons
+                        assessmentHTML += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:1rem">';
+                        
+                        data.ml.recommended_roles.forEach(role => {
+                            const icon = role.icon || '💼';
+                            const title = role.title || 'Unknown Role';
+                            const explanation = role.explanation || 'No explanation provided';
+                            const fitScore = role.fit_score || 0;
+                            
+                            // Color code based on fit score
+                            let scoreColor = '#ff6b6b';
+                            if (fitScore >= 75) scoreColor = '#51cf66';
+                            else if (fitScore >= 50) scoreColor = '#ffd43b';
+                            
+                            assessmentHTML += `
+                                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1rem;transition:transform 0.2s,box-shadow 0.2s">
+                                    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem">
+                                        <span style="font-size:2rem">${icon}</span>
+                                        <div>
+                                            <h4 style="margin:0;color:var(--text-primary);font-size:1rem">${title}</h4>
+                                            <span style="color:${scoreColor};font-weight:bold;font-size:0.9rem">${fitScore}% Match</span>
+                                        </div>
+                                    </div>
+                                    <p style="margin:0.5rem 0 0 0;color:var(--text-secondary);font-size:0.9rem;line-height:1.5">${explanation}</p>
+                                </div>
+                            `;
+                        });
+                        
+                        assessmentHTML += '</div>';
+                    } else {
+                        // Fallback: simple role strings
+                        assessmentHTML += `<p><strong>Recommended Roles:</strong> ${data.ml.recommended_roles.join(', ')}</p>`;
+                    }
                 }
             }
             

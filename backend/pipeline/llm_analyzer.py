@@ -162,6 +162,31 @@ class LLMAnalyzer:
             self._log(f"LLM call failed: {e}", "ERROR")
             raise
     
+    def _call_ollama(self, prompt: str) -> str:
+        """
+        Call Ollama directly for role recommendations (non-JSON format)
+        """
+        try:
+            if self.provider != "ollama" or not self.client:
+                raise Exception("Ollama client not available")
+            
+            self._log(f"[LLM] Calling Ollama for role recommendations")
+            
+            response = self.client.generate(
+                model=self.model,
+                prompt=prompt,
+                stream=False,
+                temperature=0.7,  # Higher temperature for creative role generation
+            )
+            
+            if isinstance(response, dict):
+                return response.get('response', '')
+            return str(response)
+            
+        except Exception as e:
+            self._log(f"Ollama call failed: {e}", "ERROR")
+            raise
+    
     def _build_analysis_prompt(self, resume_markdown: str, job_requirements: str = None) -> str:
         """
         Build analysis prompt for LLM with MANDATORY job requirements enforcement
@@ -435,30 +460,119 @@ VALIDATION RULES:
         
         return analysis
     
-    def _recommend_roles(self, skill_categories: Dict, experience_count: int) -> List[str]:
-        """Recommend roles based on skills"""
+    def _recommend_roles(self, skill_categories: Dict, experience_count: int) -> List[Dict]:
+        """Use Qwen LLM to recommend 20 detailed roles with icons and explanations"""
+        
+        # Prepare context for the LLM
+        skills_text = ", ".join([f"{k}: {v}" for k, v in skill_categories.items()])
+        
+        prompt = f"""Based on the following candidate profile, recommend exactly 20 job roles that would be a good fit.
+
+Candidate Profile:
+- Skill Categories: {skills_text}
+- Years of Experience: {experience_count}
+
+For each role, provide:
+1. Role title
+2. Brief explanation (1-2 sentences) of why this role fits the candidate
+3. Fit score (0-100) indicating how well the candidate matches
+4. An emoji icon that represents the role
+
+Format your response as a JSON array with exactly 20 roles:
+[
+  {{
+    "title": "Software Engineer",
+    "explanation": "Strong programming skills and technical background make this an excellent fit.",
+    "fit_score": 95,
+    "icon": "💻"
+  }},
+  ...
+]
+
+Return ONLY the JSON array, no additional text."""
+
+        try:
+            # Call Qwen LLM
+            response = self._call_ollama(prompt)
+            
+            # Parse JSON response
+            import json
+            import re
+            
+            # Extract JSON from response
+            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+            if json_match:
+                roles = json.loads(json_match.group(0))
+                
+                # Validate we have 20 roles
+                if isinstance(roles, list) and len(roles) >= 20:
+                    return roles[:20]
+                elif isinstance(roles, list) and len(roles) > 0:
+                    # If less than 20, return what we have
+                    self._log(f"Warning: LLM returned {len(roles)} roles instead of 20")
+                    return roles
+            
+            self._log("Failed to parse LLM response for role recommendations")
+            
+        except Exception as e:
+            self._log(f"Error calling LLM for role recommendations: {str(e)}")
+        
+        # Fallback: Generate basic recommendations
+        return self._generate_fallback_roles(skill_categories, experience_count)
+    
+    def _generate_fallback_roles(self, skill_categories: Dict, experience_count: int) -> List[Dict]:
+        """Generate fallback role recommendations if LLM fails"""
         roles = []
         
-        if skill_categories.get("programming_languages", 0) > 3:
-            roles.append("Software Engineer")
-        if skill_categories.get("data_ml", 0) > 0:
-            roles.append("Data Scientist")
-        if skill_categories.get("cloud_devops", 0) > 0:
-            roles.append("DevOps Engineer")
-        if skill_categories.get("cloud_devops", 0) > 2 and experience_count > 5:
-            roles.append("Cloud Architect")
-        if skill_categories.get("frameworks", 0) > 2:
-            roles.append("Full-Stack Developer")
+        # Define role mappings
+        role_mappings = [
+            {"title": "Software Engineer", "icon": "💻", "base_score": 80},
+            {"title": "Full-Stack Developer", "icon": "🌐", "base_score": 75},
+            {"title": "Backend Developer", "icon": "⚙️", "base_score": 75},
+            {"title": "Frontend Developer", "icon": "🎨", "base_score": 70},
+            {"title": "Data Scientist", "icon": "📊", "base_score": 70},
+            {"title": "Machine Learning Engineer", "icon": "🤖", "base_score": 65},
+            {"title": "DevOps Engineer", "icon": "🔧", "base_score": 65},
+            {"title": "Cloud Architect", "icon": "☁️", "base_score": 60},
+            {"title": "Technical Lead", "icon": "👔", "base_score": 70},
+            {"title": "Solutions Architect", "icon": "🏗️", "base_score": 65},
+            {"title": "Database Administrator", "icon": "🗄️", "base_score": 60},
+            {"title": "Site Reliability Engineer", "icon": "🛡️", "base_score": 65},
+            {"title": "QA Engineer", "icon": "🔍", "base_score": 60},
+            {"title": "Security Engineer", "icon": "🔐", "base_score": 60},
+            {"title": "Mobile Developer", "icon": "📱", "base_score": 55},
+            {"title": "Product Manager", "icon": "📋", "base_score": 55},
+            {"title": "Engineering Manager", "icon": "👨‍💼", "base_score": 65},
+            {"title": "Systems Engineer", "icon": "🖥️", "base_score": 60},
+            {"title": "AI Engineer", "icon": "🧠", "base_score": 65},
+            {"title": "Platform Engineer", "icon": "🚀", "base_score": 60}
+        ]
         
-        # Default if no specific match
-        if not roles:
+        # Adjust scores based on skills and experience
+        for role_info in role_mappings:
+            score = role_info["base_score"]
+            
+            # Boost score based on experience
             if experience_count > 5:
-                roles = ["Senior Developer", "Technical Lead"]
-            else:
-                roles = ["Software Developer", "Junior Developer"]
+                score += 10
+            elif experience_count > 2:
+                score += 5
+            
+            # Boost based on skill categories
+            if "programming_languages" in skill_categories:
+                score += min(10, skill_categories["programming_languages"] * 2)
+            
+            score = min(100, score)
+            
+            roles.append({
+                "title": role_info["title"],
+                "explanation": f"Based on your {experience_count} years of experience and skill profile, this role could be a good fit.",
+                "fit_score": score,
+                "icon": role_info["icon"]
+            })
         
         return roles
-    
+
     def _identify_opportunities(self, skill_categories: Dict) -> List[str]:
         """Identify growth opportunities"""
         opportunities = []
