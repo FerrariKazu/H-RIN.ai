@@ -1311,346 +1311,347 @@ window.onclick = function(event) {
 }
 
 function renderComparativeAnalysisHTML(comparativeData, documents) {
-          // Only render if we have actual comparative data
-          if (!comparativeData || !comparativeData.comparative_ranking || comparativeData.comparative_ranking.length === 0) {
-              return '';
-          }
-          
-          const ranking = comparativeData.comparative_ranking || [];
-          const strengths = comparativeData.strengths_comparison || '';
-          const weaknesses = comparativeData.weaknesses_comparison || '';
-          const skillMatrix = comparativeData.skill_coverage_matrix || {};
-          const strongest = comparativeData.strongest_candidate || {};
-          const hiring = comparativeData.hiring_recommendations || {};
-          const executive = comparativeData.executive_summary || '';
+    // Only render if we have actual comparative data
+    if (!comparativeData || !comparativeData.comparative_ranking || comparativeData.comparative_ranking.length === 0) {
+        return '';
+    }
+    
+    const ranking = comparativeData.comparative_ranking || [];
+    const strengths = comparativeData.strengths_comparison || '';
+    const weaknesses = comparativeData.weaknesses_comparison || '';
+    const skillMatrix = comparativeData.skill_coverage_matrix || {};
+    const strongest = comparativeData.strongest_candidate || {};
+    const hiring = comparativeData.hiring_recommendations || {};
+    const executive = comparativeData.executive_summary || '';
 
-          // New comprehensive fields
-          const candidateProfiles = comparativeData.candidate_profiles || [];
-          const experienceSummaries = comparativeData.experience_summaries || [];
-          const skillsAndEntities = comparativeData.skills_and_entities || [];
-          const aiFitScores = comparativeData.ai_fit_scores || [];
-          const evaluationFactors = comparativeData.evaluation_factors || [];
-          const recommendedRoles = comparativeData.recommended_roles || [];
+    // New comprehensive fields
+    const candidateProfiles = comparativeData.candidate_profiles || [];
+    const experienceSummaries = comparativeData.experience_summaries || [];
+    const skillsAndEntities = comparativeData.skills_and_entities || [];
+    const aiFitScores = comparativeData.ai_fit_scores || [];
+    const evaluationFactors = comparativeData.evaluation_factors || [];
+    const recommendedRoles = comparativeData.recommended_roles || [];
 
-          let html = `
-              <h3 style="margin-top: 2rem;"><i data-lucide="trending-up"></i> PASS 2: Cross-Candidate Comparative Analysis</h3>
-              
-              <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                  <strong>AI Executive Summary:</strong>
-                  <p>${executive}</p>
-              </div>
+    let html = `
+        <h3 style="margin-top: 2rem;"><i data-lucide="trending-up"></i> PASS 2: Cross-Candidate Comparative Analysis</h3>
+        
+        <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+            <strong>AI Executive Summary:</strong>
+            <p>${executive}</p>
+        </div>
 
-              <!-- Candidate Profiles -->
-              <div style="margin: 2rem 0;">
-                  <h4>👥 Candidate Profiles (AI-Generated Comparative)</h4>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-          `;
-          
-          candidateProfiles.forEach(profile => {
-              const docId = profile.document_id || 'Unknown';
-              const name = profile.name || 'Unknown';
-              const summary = profile.summary || 'No summary available';
-              const seniority = profile.seniority_level || 'mid';
-              const yearsExp = profile.years_experience || 0;
-              const compared = profile.compared_to_others || '';
-              
-              html += `
-                      <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid var(--accent);">
-                          <strong style="color: var(--accent);">${name}</strong>
-                          <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0;">
-                              ${seniority} | ${yearsExp} years experience
-                          </p>
-                          <p style="font-size: 0.9rem; margin-top: 0.5rem;">${summary}</p>
-                          ${compared ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic;">
-                              📊 ${compared}
-                          </p>` : ''}
-                      </div>
-              `;
-          });
-          
-          html += `
-                  </div>
-              </div>
+        <!-- Candidate Profiles -->
+        <div style="margin: 2rem 0;">
+            <h4>👥 Candidate Profiles (AI-Generated Comparative)</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+    `;
+    
+    candidateProfiles.forEach(profile => {
+        const docId = profile.document_id || 'Unknown';
+        const name = profile.name || 'Unknown';
+        const summary = profile.summary || 'No summary available';
+        const seniority = profile.seniority_level || 'mid';
+        const yearsExp = profile.years_experience || 0;
+        const compared = profile.compared_to_others || '';
+        
+        html += `
+                <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid var(--accent);">
+                    <strong style="color: var(--accent);">${name}</strong>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0;">
+                        ${seniority} | ${yearsExp} years experience
+                    </p>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">${summary}</p>
+                    ${compared ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic;">
+                        📊 ${compared}
+                    </p>` : ''}
+                </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
 
-              <!-- Experience Summaries -->
-              <div style="margin: 2rem 0;">
-                  <h4>💼 Experience Analysis (Comparative)</h4>
-          `;
-          
-          experienceSummaries.forEach(expSum => {
-              const docId = expSum.document_id || 'Unknown';
-              const candidate = documents.find(d => d.document_id === docId);
-              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-              const expQuality = expSum.experience_quality || 'Not assessed';
-              const keyPositions = expSum.key_positions || [];
-              const compStrength = expSum.comparative_strength || '';
-              
-              html += `
-                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
-                          <strong>${name}</strong>
-                          <p style="margin: 0.5rem 0;">${expQuality}</p>
-                          ${keyPositions.length > 0 ? `<p style="font-size: 0.9rem; color: var(--text-secondary);">
-                              <strong>Key Roles:</strong> ${keyPositions.join(', ')}
-                          </p>` : ''}
-                          ${compStrength ? `<p style="font-size: 0.9rem; color: var(--accent); margin-top: 0.5rem; font-style: italic;">
-                              📊 ${compStrength}
-                          </p>` : ''}
-                      </div>
-              `;
-          });
-          
-          html += `
-              </div>
+        <!-- Experience Summaries -->
+        <div style="margin: 2rem 0;">
+            <h4>💼 Experience Analysis (Comparative)</h4>
+    `;
+    
+    experienceSummaries.forEach(expSum => {
+        const docId = expSum.document_id || 'Unknown';
+        const candidate = documents.find(d => d.document_id === docId);
+        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+        const expQuality = expSum.experience_quality || 'Not assessed';
+        const keyPositions = expSum.key_positions || [];
+        const compStrength = expSum.comparative_strength || '';
+        
+        html += `
+                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
+                    <strong>${name}</strong>
+                    <p style="margin: 0.5rem 0;">${expQuality}</p>
+                    ${keyPositions.length > 0 ? `<p style="font-size: 0.9rem; color: var(--text-secondary);">
+                        <strong>Key Roles:</strong> ${keyPositions.join(', ')}
+                    </p>` : ''}
+                    ${compStrength ? `<p style="font-size: 0.9rem; color: var(--accent); margin-top: 0.5rem; font-style: italic;">
+                        📊 ${compStrength}
+                    </p>` : ''}
+                </div>
+        `;
+    });
+    
+    html += `
+        </div>
 
-              <!-- Skills & Entities (Certificates, Skills) -->
-              <div style="margin: 2rem 0;">
-                  <h4>🎯 Skills & Entities Comparison</h4>
-          `;
-          
-          skillsAndEntities.forEach(skillData => {
-              const docId = skillData.document_id || 'Unknown';
-              const candidate = documents.find(d => d.document_id === docId);
-              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-              const techSkills = skillData.technical_skills || [];
-              const softSkills = skillData.soft_skills || [];
-              const certs = skillData.certifications || [];
-              const uniqueSkills = skillData.unique_skills || [];
-              const gaps = skillData.skill_gaps || [];
-              
-              html += `
-                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem;">
-                          <strong style="color: var(--accent);">${name}</strong>
-                          
-                          ${techSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong>Technical Skills:</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${techSkills.map(skill => `<span class="skill-tag matched">${skill}</span>`).join(' ')}
-                              </div>
-                          </div>` : ''}
-                          
-                          ${softSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong>Soft Skills:</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${softSkills.map(skill => `<span class="skill-tag" style="background: rgba(61, 169, 250, 0.2);">${skill}</span>`).join(' ')}
-                              </div>
-                          </div>` : ''}
-                          
-                          ${certs.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong>Certifications:</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${certs.map(cert => `<span class="badge badge-success">📜 ${cert}</span>`).join(' ')}
-                              </div>
-                          </div>` : ''}
-                          
-                          ${uniqueSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong>Unique Skills (vs others):</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${uniqueSkills.map(skill => `<span class="skill-tag" style="background: rgba(255, 193, 7, 0.2); border-color: #ffc107;">⭐ ${skill}</span>`).join(' ')}
-                              </div>
-                          </div>` : ''}
-                          
-                          ${gaps.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong>Skill Gaps (vs others):</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${gaps.map(gap => `<span class="skill-tag missing">⚠ ${gap}</span>`).join(' ')}
-                              </div>
-                          </div>` : ''}
-                      </div>
-              `;
-          });
-          
-          html += `
-              </div>
+        <!-- Skills & Entities (Certificates, Skills) -->
+        <div style="margin: 2rem 0;">
+            <h4>🎯 Skills & Entities Comparison</h4>
+    `;
+    
+    skillsAndEntities.forEach(skillData => {
+        const docId = skillData.document_id || 'Unknown';
+        const candidate = documents.find(d => d.document_id === docId);
+        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+        const techSkills = skillData.technical_skills || [];
+        const softSkills = skillData.soft_skills || [];
+        const certs = skillData.certifications || [];
+        const uniqueSkills = skillData.unique_skills || [];
+        const gaps = skillData.skill_gaps || [];
+        
+        html += `
+                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem;">
+                    <strong style="color: var(--accent);">${name}</strong>
+                    
+                    ${techSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong>Technical Skills:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${techSkills.map(skill => `<span class="skill-tag matched">${skill}</span>`).join(' ')}
+                        </div>
+                    </div>` : ''}
+                    
+                    ${softSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong>Soft Skills:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${softSkills.map(skill => `<span class="skill-tag" style="background: rgba(61, 169, 250, 0.2);">${skill}</span>`).join(' ')}
+                        </div>
+                    </div>` : ''}
+                    
+                    ${certs.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong>Certifications:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${certs.map(cert => `<span class="badge badge-success">📜 ${cert}</span>`).join(' ')}
+                        </div>
+                    </div>` : ''}
+                    
+                    ${uniqueSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong>Unique Skills (vs others):</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${uniqueSkills.map(skill => `<span class="skill-tag" style="background: rgba(255, 193, 7, 0.2); border-color: #ffc107;">⭐ ${skill}</span>`).join(' ')}
+                        </div>
+                    </div>` : ''}
+                    
+                    ${gaps.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong>Skill Gaps (vs others):</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${gaps.map(gap => `<span class="skill-tag missing">⚠ ${gap}</span>`).join(' ')}
+                        </div>
+                    </div>` : ''}
+                </div>
+        `;
+    });
+    
+    html += `
+        </div>
 
-              <!-- AI Fit Scores & Evaluation Factors -->
-              <div style="margin: 2rem 0;">
-                  <h4>📊 AI Fit Scores & Evaluation Factors</h4>
-                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
-          `;
-          
-          aiFitScores.forEach(scoreData => {
-              const docId = scoreData.document_id || 'Unknown';
-              const candidate = documents.find(d => d.document_id === docId);
-              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-              const overallScore = scoreData.overall_fit_score || 0;
-              const comparedToGroup = scoreData.compared_to_group || 'average';
-              const scoreBreakdown = scoreData.score_breakdown || {};
-              const whyScore = scoreData.why_this_score || 'No explanation provided';
-              
-              // Find evaluation factors for this candidate
-              const evalFactor = evaluationFactors.find(ef => ef.document_id === docId) || {};
-              const strengths = evalFactor.strengths || [];
-              const weaknesses = evalFactor.weaknesses || [];
-              const opportunities = evalFactor.opportunities || [];
-              const compAdvantages = evalFactor.comparative_advantages || [];
-              const compDisadvantages = evalFactor.comparative_disadvantages || [];
-              
-              const scoreColor = getScoreColor(overallScore);
-              
-              html += `
-                      <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid ${scoreColor};">
-                          <strong style="color: ${scoreColor};">${name}</strong>
-                          <div style="font-size: 2rem; font-weight: bold; color: ${scoreColor}; margin: 0.5rem 0;">
-                              ${overallScore}/100
-                          </div>
-                          <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                              <strong>vs Group:</strong> ${comparedToGroup}
-                          </p>
-                          
-                          ${Object.keys(scoreBreakdown).length > 0 ? `<div style="margin-top: 1rem; font-size: 0.85rem;">
-                              <strong>Score Breakdown:</strong>
-                              <div style="margin-top: 0.5rem;">
-                                  ${Object.entries(scoreBreakdown).map(([key, value]) => 
-                                      `<div style="display: flex; justify-content: space-between; margin: 0.25rem 0;">
-                                          <span>${key.replace(/_/g, ' ')}:</span>
-                                          <span style="font-weight: bold;">${value}/100</span>
-                                      </div>`
-                                  ).join('')}
-                              </div>
-                          </div>` : ''}
-                          
-                          <p style="font-size: 0.9rem; margin-top: 1rem; font-style: italic;">
-                              ${whyScore}
-                          </p>
-                          
-                          ${strengths.length > 0 ? `<div style="margin-top: 1rem;">
-                              <strong style="color: #4CAF50;">Strengths:</strong>
-                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                                  ${strengths.map(s => `<li>${s}</li>`).join('')}
-                              </ul>
-                          </div>` : ''}
-                          
-                          ${weaknesses.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong style="color: #F44336;">Weaknesses:</strong>
-                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                                  ${weaknesses.map(w => `<li>${w}</li>`).join('')}
-                              </ul>
-                          </div>` : ''}
-                          
-                          ${compAdvantages.length > 0 ? `<div style="margin-top: 0.75rem;">
-                              <strong style="color: var(--accent);">Comparative Advantages:</strong>
-                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                                  ${compAdvantages.map(ca => `<li>⭐ ${ca}</li>`).join('')}
-                              </ul>
-                          </div>` : ''}
-                      </div>
-              `;
-          });
-          
-          html += `
-                  </div>
-              </div>
+        <!-- AI Fit Scores & Evaluation Factors -->
+        <div style="margin: 2rem 0;">
+            <h4>📊 AI Fit Scores & Evaluation Factors</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
+    `;
+    
+    aiFitScores.forEach(scoreData => {
+        const docId = scoreData.document_id || 'Unknown';
+        const candidate = documents.find(d => d.document_id === docId);
+        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+        const overallScore = scoreData.overall_fit_score || 0;
+        const comparedToGroup = scoreData.compared_to_group || 'average';
+        const scoreBreakdown = scoreData.score_breakdown || {};
+        const whyScore = scoreData.why_this_score || 'No explanation provided';
+        
+        // Find evaluation factors for this candidate
+        const evalFactor = evaluationFactors.find(ef => ef.document_id === docId) || {};
+        const strengths = evalFactor.strengths || [];
+        const weaknesses = evalFactor.weaknesses || [];
+        const opportunities = evalFactor.opportunities || [];
+        const compAdvantages = evalFactor.comparative_advantages || [];
+        const compDisadvantages = evalFactor.comparative_disadvantages || [];
+        
+        const scoreColor = getScoreColor(overallScore);
+        
+        html += `
+                <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid ${scoreColor};">
+                    <strong style="color: ${scoreColor};">${name}</strong>
+                    <div style="font-size: 2rem; font-weight: bold; color: ${scoreColor}; margin: 0.5rem 0;">
+                        ${overallScore}/100
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        <strong>vs Group:</strong> ${comparedToGroup}
+                    </p>
+                    
+                    ${Object.keys(scoreBreakdown).length > 0 ? `<div style="margin-top: 1rem; font-size: 0.85rem;">
+                        <strong>Score Breakdown:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${Object.entries(scoreBreakdown).map(([key, value]) => 
+                                `<div style="display: flex; justify-content: space-between; margin: 0.25rem 0;">
+                                    <span>${key.replace(/_/g, ' ')}:</span>
+                                    <span style="font-weight: bold;">${value}/100</span>
+                                </div>`
+                            ).join('')}
+                        </div>
+                    </div>` : ''}
+                    
+                    <p style="font-size: 0.9rem; margin-top: 1rem; font-style: italic;">
+                        ${whyScore}
+                    </p>
+                    
+                    ${strengths.length > 0 ? `<div style="margin-top: 1rem;">
+                        <strong style="color: #4CAF50;">Strengths:</strong>
+                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                            ${strengths.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    
+                    ${weaknesses.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong style="color: #F44336;">Weaknesses:</strong>
+                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                            ${weaknesses.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    
+                    ${compAdvantages.length > 0 ? `<div style="margin-top: 0.75rem;">
+                        <strong style="color: var(--accent);">Comparative Advantages:</strong>
+                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                            ${compAdvantages.map(ca => `<li>⭐ ${ca}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
 
-              <!-- Recommended Roles (AI-Generated, Minimum 5 per candidate) -->
-              <div style="margin: 2rem 0;">
-                  <h4>💼 AI-Recommended Roles (Comparative Analysis)</h4>
-          `;
-          
-          recommendedRoles.forEach(roleData => {
-              const docId = roleData.document_id || 'Unknown';
-              const candidate = documents.find(d => d.document_id === docId);
-              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-              const roles = roleData.roles || [];
-              
-              html += `
-                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
-                          <strong style="color: var(--accent);">${name}</strong>
-                          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
-          `;
-          
-          roles.forEach((role, idx) => {
-              const title = role.title || 'Unknown Role';
-              const fitScore = role.fit_score || 0;
-              const why = role.why_good_fit || '';
-              const compared = role.compared_to_others || '';
-              const roleColor = fitScore >= 75 ? '#4CAF50' : fitScore >= 50 ? '#FF9800' : '#F44336';
-              
-              html += `
-                              <div style="background: rgba(61, 169, 250, 0.05); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border);">
-                                  <div style="font-weight: bold; margin-bottom: 0.5rem;">${title}</div>
-                                  <div style="color: ${roleColor}; font-weight: bold; margin-bottom: 0.5rem;">
-                                      Fit: ${fitScore}/100
-                                  </div>
-                                  ${why ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                                      ${why}
-                                  </p>` : ''}
-                                  ${compared ? `<p style="font-size: 0.8rem; color: var(--accent); font-style: italic;">
-                                      📊 ${compared}
-                                  </p>` : ''}
-                              </div>
-              `;
-          });
-          
-          html += `
-                          </div>
-                      </div>
-              `;
-          });
-          
-          html += `
-              </div>
+        <!-- Recommended Roles (AI-Generated, Minimum 5 per candidate) -->
+        <div style="margin: 2rem 0;">
+            <h4>💼 AI-Recommended Roles (Comparative Analysis)</h4>
+    `;
+    
+    recommendedRoles.forEach(roleData => {
+        const docId = roleData.document_id || 'Unknown';
+        const candidate = documents.find(d => d.document_id === docId);
+        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+        const roles = roleData.roles || [];
+        
+        html += `
+                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
+                    <strong style="color: var(--accent);">${name}</strong>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
+        `;
+        
+        roles.forEach((role, idx) => {
+            const title = role.title || 'Unknown Role';
+            const fitScore = role.fit_score || 0;
+            const why = role.why_good_fit || '';
+            const compared = role.compared_to_others || '';
+            const roleColor = fitScore >= 75 ? '#4CAF50' : fitScore >= 50 ? '#FF9800' : '#F44336';
+            
+            html += `
+                        <div style="background: rgba(61, 169, 250, 0.05); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+                            <div style="font-weight: bold; margin-bottom: 0.5rem;">${title}</div>
+                            <div style="color: ${roleColor}; font-weight: bold; margin-bottom: 0.5rem;">
+                                Fit: ${fitScore}/100
+                            </div>
+                            ${why ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                ${why}
+                            </p>` : ''}
+                            ${compared ? `<p style="font-size: 0.8rem; color: var(--accent); font-style: italic;">
+                                📊 ${compared}
+                            </p>` : ''}
+                        </div>
+            `;
+        });
+        
+        html += `
+                        </div>
+                    </div>
+            `;
+    });
+    
+    html += `
+            </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
-                  <!-- Comparative Ranking -->
-                  <div>
-                      <h4>📊 Final Ranking (Normalized)</h4>
-                      <table style="width: 100%; font-size: 0.9rem;">
-                          <thead>
-                              <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
-                                  <th style="padding: 0.5rem; text-align: left;">Rank</th>
-                                  <th style="padding: 0.5rem; text-align: left;">Candidate</th>
-                                  <th style="padding: 0.5rem; text-align: right;">Score</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-          `;
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
+                <!-- Comparative Ranking -->
+                <div>
+                    <h4>📊 Final Ranking (Normalized)</h4>
+                    <table style="width: 100%; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
+                                <th style="padding: 0.5rem; text-align: left;">Rank</th>
+                                <th style="padding: 0.5rem; text-align: left;">Candidate</th>
+                                <th style="padding: 0.5rem; text-align: right;">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
 
-          ranking.forEach(item => {
-              const docId = item.document_id;
-              const candidate = documents.find(d => d.document_id === docId);
-              const candidateName = candidate?.analysis?.llm_analysis?.candidate_name || candidate?.filename || docId;
-              const scoreColor = getScoreColor(item.normalized_fit_score || 0);
-              
-              html += `
-                              <tr>
-                                  <td style="padding: 0.5rem; font-weight: bold;">#${item.rank}</td>
-                                  <td style="padding: 0.5rem;">${candidateName}</td>
-                                  <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
-                                      ${item.normalized_fit_score}/100
-                                  </td>
-                              </tr>
-                              <tr>
-                                  <td colspan="3" style="padding: 0.5rem; font-size: 0.85rem; color: #666; border-bottom: 1px solid var(--border);">
-                                      ${item.rationale || ''}
-                                  </td>
-                              </tr>
-              `;
-          });
+        ranking.forEach(item => {
+            const docId = item.document_id;
+            const candidate = documents.find(d => d.document_id === docId);
+            const candidateName = candidate?.analysis?.llm_analysis?.candidate_name || candidate?.filename || docId;
+            const scoreColor = getScoreColor(item.normalized_fit_score || 0);
+            
+            html += `
+                            <tr>
+                                <td style="padding: 0.5rem; font-weight: bold;">#${item.rank}</td>
+                                <td style="padding: 0.5rem;">${candidateName}</td>
+                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
+                                    ${item.normalized_fit_score}/100
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="padding: 0.5rem; font-size: 0.85rem; color: #666; border-bottom: 1px solid var(--border);">
+                                    ${item.rationale || ''}
+                                </td>
+                            </tr>
+            `;
+        });
 
-          html += `
-                          </tbody>
-                      </table>
-                  </div>
-                  
-                  <!-- Top Candidate -->
-                  <div>
-                      <h4>🏆 Top Candidate</h4>
-                      <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #4CAF50;">
-                          <strong>${strongest.reason || 'Best overall fit'}</strong>
-                      </div>
-                  </div>
-              </div>
-              
-              <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                  <h4>💪 Strengths Comparison</h4>
-                  <p>${strengths || 'No strengths comparison available'}</p>
-              </div>
-              
-              <div style="background: rgba(244, 67, 54, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                  <h4>⚠ Weaknesses Comparison</h4>
-                  <p>${weaknesses || 'No weaknesses comparison available'}</p>
-              </div>
-          `;
-          
-          return html;
-      }
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Top Candidate -->
+                <div>
+                    <h4>🏆 Top Candidate</h4>
+                    <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #4CAF50;">
+                        <strong>${strongest.reason || 'Best overall fit'}</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                <h4>💪 Strengths Comparison</h4>
+                <p>${strengths || 'No strengths comparison available'}</p>
+            </div>
+            
+            <div style="background: rgba(244, 67, 54, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                <h4>⚠ Weaknesses Comparison</h4>
+                <p>${weaknesses || 'No weaknesses comparison available'}</p>
+            </div>
+        `;
+        
+        return html;
+    }
+}
