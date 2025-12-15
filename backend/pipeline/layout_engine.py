@@ -12,11 +12,10 @@ class LayoutEngine:
         # Fallback to simple heuristic if model load fails (common on Windows without Detectron2)
         self.model = None
         try:
-            # lp.Detectron2LayoutModel is creating issues on Windows without pre-compiled deps.
-            # Using Tesseract as a layout detector via LayoutParser wrapper if DL fails.
-            self.model = lp.TesseractAgent(languages='eng') 
+            # Try loading Tesseract agent for layout detection
+            self.model = lp.TesseractAgent(languages='eng')
         except Exception as e:
-            logger.warning(f"Could not load LayoutParser model: {e}. Using raw text heuristics.")
+            logger.warning(f"Could not load LayoutParser model: {e}. Using fallback.")
 
     def analyze(self, image_bytes):
         """
