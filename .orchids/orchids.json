@@ -1,0 +1,8 @@
+{
+  "projectId": "a0d929e9-ccea-4691-a056-c5abda92cbb0",
+  "createdAt": 1765809907860,
+  "startupCommands": [
+    "powershell -Command \"Set-Location 'C:\\Users\\FerrariKazu\\Documents\\AI Folder\\P3\\AM-DS-01'; python backend/main.py\"",
+    "powershell -Command \"Set-Location 'C:\\Users\\FerrariKazu\\Documents\\AI Folder\\P3\\AM-DS-01'; python -m http.server 3000\""
+  ]
+}

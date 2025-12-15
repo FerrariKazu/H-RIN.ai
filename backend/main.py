@@ -12,20 +12,28 @@ import logging
 # Allow importing from root directory (agent, etc.)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import Pipeline Engines
-from backend.pipeline.pdf_parser import PDFParser
-from backend.pipeline.ocr_engine import OCREngine
-from backend.pipeline.nlp_engine import NLPEngine
-from backend.pipeline.layout_engine import LayoutEngine
-
-# Import existing agents (keeping for ML/LLM logic)
-from agent.extractors.llm_structured_extractor import LLMStructuredExtractor
-from agent.ml.evaluator import MLEvaluator
-from agent.reporting.hr_report_generator import HRReportGenerator
-
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HR_Buddy_Backend")
+
+# Import Pipeline Engines (with fallback)
+PDFParser = OCREngine = NLPEngine = LayoutEngine = None
+try:
+    from backend.pipeline.pdf_parser import PDFParser
+    from backend.pipeline.ocr_engine import OCREngine
+    from backend.pipeline.nlp_engine import NLPEngine
+    from backend.pipeline.layout_engine import LayoutEngine
+except ImportError as e:
+    logger.warning(f"Pipeline imports failed: {e}. Server will run without full pipeline support.")
+
+# Import existing agents (keeping for ML/LLM logic)
+LLMStructuredExtractor = MLEvaluator = HRReportGenerator = None
+try:
+    from agent.extractors.llm_structured_extractor import LLMStructuredExtractor
+    from agent.ml.evaluator import MLEvaluator
+    from agent.reporting.hr_report_generator import HRReportGenerator
+except ImportError as e:
+    logger.warning(f"Agent imports failed: {e}. Server will run with limited functionality.")
 
 app = FastAPI(title="HR Buddy API", version="3.0 - Production")
 
@@ -38,16 +46,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Pipeline
-pdf_parser = PDFParser()
-ocr_engine = OCREngine()
-nlp_engine = NLPEngine()
-layout_engine = LayoutEngine()
+# Initialize Pipeline (skip if imports failed)
+pdf_parser = None
+ocr_engine = None
+nlp_engine = None
+layout_engine = None
+llm_extractor = None
+ml_evaluator = None
+report_generator = None
 
-# Initialize Agents
-llm_extractor = LLMStructuredExtractor()
-ml_evaluator = MLEvaluator()
-report_generator = HRReportGenerator()
+if PDFParser:
+    try:
+        pdf_parser = PDFParser()
+        ocr_engine = OCREngine()
+        nlp_engine = NLPEngine()
+        layout_engine = LayoutEngine()
+    except Exception as e:
+        logger.warning(f"Pipeline initialization failed: {e}")
+
+if LLMStructuredExtractor:
+    try:
+        llm_extractor = LLMStructuredExtractor()
+        ml_evaluator = MLEvaluator()
+        report_generator = HRReportGenerator()
+    except Exception as e:
+        logger.warning(f"Agent initialization failed: {e}")
 
 # Models
 class NLPRequest(BaseModel):
@@ -73,6 +96,8 @@ def health_check():
 
 @app.post("/upload_cv")
 async def upload_cv(file: UploadFile = File(...)):
+    if not pdf_parser:
+        raise HTTPException(status_code=503, detail="PDF parser not initialized")
     try:
         # Save temp file
         temp_path = f"temp_{file.filename}"
@@ -118,6 +143,8 @@ async def upload_cv(file: UploadFile = File(...)):
 
 @app.post("/nlp_extract")
 async def nlp_extract_endpoint(req: NLPRequest):
+    if not nlp_engine:
+        raise HTTPException(status_code=503, detail="NLP engine not initialized")
     try:
         # Use new generic NLP Engine
         data = nlp_engine.extract(req.text)
@@ -128,6 +155,8 @@ async def nlp_extract_endpoint(req: NLPRequest):
 
 @app.post("/extract_structured")
 async def extract_structured_endpoint(req: StructureRequest):
+    if not llm_extractor:
+        raise HTTPException(status_code=503, detail="LLM extractor not initialized")
     try:
         data = llm_extractor.extract(req.text, req.nlp_data)
         return data
@@ -137,6 +166,8 @@ async def extract_structured_endpoint(req: StructureRequest):
 
 @app.post("/evaluate")
 async def evaluate_endpoint(req: EvaluationRequest):
+    if not ml_evaluator:
+        raise HTTPException(status_code=503, detail="ML evaluator not initialized")
     try:
         result = ml_evaluator.evaluate(req.text, req.structured_data)
         return result
@@ -146,6 +177,8 @@ async def evaluate_endpoint(req: EvaluationRequest):
 
 @app.post("/generate_report")
 async def generate_report_endpoint(req: ReportRequest):
+    if not report_generator:
+        raise HTTPException(status_code=503, detail="Report generator not initialized")
     try:
         html_report = report_generator.generate_report(req.structured_data, req.ml_result)
         return {"html": html_report}
