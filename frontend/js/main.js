@@ -320,7 +320,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.ml.key_achievements && Array.isArray(data.ml.key_achievements)) {
                 assessmentHTML += '<h2>Key Achievements</h2><ul>';
                 data.ml.key_achievements.forEach(achievement => {
-                    assessmentHTML += `<li>${achievement}</li>`;
+                    // Filter out empty or invalid achievements
+                    if (achievement && achievement.trim() !== '' && achievement !== 'Position not extracted') {
+                        assessmentHTML += `<li>${achievement}</li>`;
+                    }
                 });
                 assessmentHTML += '</ul>';
             }
@@ -330,7 +333,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 assessmentHTML += '<h2>Key Metrics</h2><ul>';
                 Object.entries(data.ml.key_metrics).forEach(([key, value]) => {
                     const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    assessmentHTML += `<li><strong>${formattedKey}:</strong> ${value}</li>`;
+                    // Format value properly - handle objects
+                    let formattedValue = value;
+                    if (key === 'skill_categories' && typeof value === 'object') {
+                        // Format skill categories as readable string
+                        formattedValue = Object.entries(value)
+                            .map(([cat, count]) => `${cat.replace(/_/g, ' ')}: ${count}`)
+                            .join(', ');
+                    }
+                    assessmentHTML += `<li><strong>${formattedKey}:</strong> ${formattedValue}</li>`;
                 });
                 assessmentHTML += '</ul>';
             }
