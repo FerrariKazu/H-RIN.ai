@@ -324,6 +324,25 @@ section {
     padding: 1.5rem;
 }
 
+.card h1 {
+    margin-bottom: 1.5rem;
+    margin-top: 0;
+}
+
+.card h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    color: var(--accent);
+}
+
+.card h2:first-child {
+    margin-top: 0;
+}
+
 .card h3 {
     display: flex;
     align-items: center;
@@ -331,6 +350,34 @@ section {
     margin-bottom: 1rem;
     font-size: 1.1rem;
     color: var(--accent);
+}
+
+.card ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.card ul li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.card ul li::before {
+    content: "•";
+    position: absolute;
+    left: 0.5rem;
+    color: var(--accent);
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.card ul li strong {
+    color: var(--text-primary);
 }
 
 .content-text {
