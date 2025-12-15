@@ -1,4 +1,3 @@
-<initial_code>
 // Get API URL from window or default to localhost:8002
 let API_URL = window.VITE_API_URL || "http://localhost:8002";
 
@@ -1310,9 +1309,8 @@ window.onclick = function(event) {
         event.target.style.display = 'none';
     }
 }
-</initial_code>
-<edited_code>
-      function renderComparativeAnalysisHTML(comparativeData, documents) {
+
+function renderComparativeAnalysisHTML(comparativeData, documents) {
           // Only render if we have actual comparative data
           if (!comparativeData || !comparativeData.comparative_ranking || comparativeData.comparative_ranking.length === 0) {
               return '';
@@ -1656,5 +1654,3 @@ window.onclick = function(event) {
           
           return html;
       }
-
-</edited_code>
