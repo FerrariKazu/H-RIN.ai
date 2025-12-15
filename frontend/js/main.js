@@ -652,6 +652,71 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (jobFitSection) {
             jobFitSection.style.display = 'none';
         }
+
+        // 6. Recommended Roles (below h3 in main layout)
+        const rolesListEl = document.getElementById('roles-list');
+        if (rolesListEl) {
+            rolesListEl.innerHTML = '';
+
+            if (mlData.recommended_roles && Array.isArray(mlData.recommended_roles)) {
+                const roles = mlData.recommended_roles.slice(0, 20);
+                const firstRole = roles[0];
+
+                if (firstRole && typeof firstRole === 'object' && firstRole.title) {
+                    // Detailed role objects with icon/explanation/fit_score
+                    rolesListEl.style.display = 'grid';
+                    rolesListEl.style.gridTemplateColumns = 'repeat(auto-fill, minmax(260px, 1fr))';
+                    rolesListEl.style.gap = '1rem';
+
+                    roles.forEach(role => {
+                        const icon = role.icon || '💼';
+                        const title = role.title || 'Role';
+                        const explanation = role.explanation || 'No explanation provided';
+                        const fitScore = role.fit_score ?? role.score ?? 0;
+
+                        let scoreColor = '#ff6b6b';
+                        if (fitScore >= 75) scoreColor = '#51cf66';
+                        else if (fitScore >= 50) scoreColor = '#ffd43b';
+
+                        const card = document.createElement('div');
+                        card.style.background = 'var(--bg-card)';
+                        card.style.border = '1px solid var(--border)';
+                        card.style.borderRadius = '8px';
+                        card.style.padding = '0.9rem';
+                        card.style.display = 'flex';
+                        card.style.flexDirection = 'column';
+                        card.style.gap = '0.35rem';
+
+                        card.innerHTML = `
+                            <div style="display:flex;align-items:center;gap:0.65rem;">
+                                <span style="font-size:1.8rem;line-height:1;">${icon}</span>
+                                <div>
+                                    <div style="font-weight:700;color:var(--text-primary);">${title}</div>
+                                    <div style="color:${scoreColor};font-weight:600;font-size:0.9rem;">${Math.round(fitScore)}% match</div>
+                                </div>
+                            </div>
+                            <div style="color:var(--text-secondary);font-size:0.9rem;line-height:1.4;">${explanation}</div>
+                        `;
+
+                        rolesListEl.appendChild(card);
+                    });
+                } else {
+                    // Simple strings fallback
+                    rolesListEl.style.display = 'flex';
+                    rolesListEl.style.flexWrap = 'wrap';
+                    rolesListEl.style.gap = '0.5rem';
+
+                    roles.forEach(role => {
+                        const tag = document.createElement('span');
+                        tag.className = 'skill-tag';
+                        tag.textContent = role;
+                        rolesListEl.appendChild(tag);
+                    });
+                }
+            } else {
+                rolesListEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No recommended roles available.</p>';
+            }
+        }
     }
 
     function addRow(tbody, cell1, cell2, cell3) {
