@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ResumeJSON:
     """Structured resume JSON format"""
+    name: str = ""
     summary: str = ""
     contact: Dict = None
     skills: List[Dict] = None
@@ -45,6 +46,7 @@ class ResumeJSON:
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
         return {
+            "name": self.name,
             "summary": self.summary,
             "contact": self.contact,
             "skills": self.skills,
@@ -103,6 +105,18 @@ class ResumeReconstructor:
                    sections: Optional[Dict]) -> ResumeJSON:
         """Build structured JSON from extracted data"""
         resume = ResumeJSON()
+        
+        # Extract name from persons entities or first line
+        persons = nlp_data.get("entities", {}).get("persons", [])
+        if persons and len(persons) > 0:
+            # Use first person entity as name
+            first_person = persons[0]
+            resume.name = first_person.get("text", "") if isinstance(first_person, dict) else first_person
+        else:
+            # Fallback: use first line of text if it looks like a name (short and no special chars)
+            first_line = raw_text.split('\n')[0].strip()
+            if first_line and len(first_line) < 50 and not any(char in first_line for char in ['@', 'http', ':', '=']):
+                resume.name = first_line
         
         # Contact information
         contact_data = nlp_data.get("entities", {}).get("contact", {})

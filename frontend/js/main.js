@@ -147,10 +147,16 @@ document.addEventListener('DOMContentLoaded', function() {
             addLog(`📄 Document type: ${uploadResult.document_type}`);
             addLog(`🔍 Confidence: ${(uploadResult.confidence * 100).toFixed(1)}%`);
 
-            // Step 2: Analysis with job requirements
+            // Step 2: Analysis with job requirements (MANDATORY ENFORCEMENT)
             addLog("🧠 Running analysis pipeline...");
-            if (state.jobRequirements) {
-                addLog(`📋 Using job requirements (${state.jobRequirements.split(' ').length} words)`);
+            const jobReqsText = state.jobRequirements || "";
+            const jobReqsWords = jobReqsText.trim().length > 0 ? jobReqsText.split(/\s+/).length : 0;
+            
+            if (jobReqsText.trim().length > 0) {
+                addLog(`✓ Job Requirements: ${jobReqsWords} words`);
+                addLog(`📋 Context: "${jobReqsText.substring(0, 100)}${jobReqsText.length > 100 ? '...' : ''}"`);
+            } else {
+                addLog(`⚠ No job requirements provided - will use generic analysis`);
             }
             
             const analyzeRes = await fetch(`${API_URL}/analyze`, {
@@ -160,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     filename: file.name,
                     extracted_text: uploadResult.raw_text,
                     enable_llm_analysis: true,
-                    job_requirements: state.jobRequirements || null
+                    job_requirements: jobReqsText
                 })
             });
             
@@ -278,6 +284,34 @@ document.addEventListener('DOMContentLoaded', function() {
             <p><strong>Latest Role:</strong> ${latestRole}</p>
             <p><strong>Latest Company:</strong> ${experience[0]?.company || "N/A"}</p>
         `;
+        
+        // Analysis Context - Display Job Requirements Used
+        const contextEl = document.getElementById('analysis-context');
+        if (contextEl) {
+            let contextHTML = '<h3>Analysis Context</h3>';
+            
+            // Job Requirements Status
+            if (data.ml && data.ml.job_requirements_used !== undefined) {
+                const jobReqsUsed = data.ml.job_requirements_used;
+                const jobReqsHash = data.ml.job_requirements_hash || 'N/A';
+                
+                contextHTML += `
+                    <p><strong>Job Requirements Used:</strong> ${jobReqsUsed ? '✅ Yes' : '❌ No'}</p>
+                    <p><strong>Hash (Verification):</strong> <code style="font-size:0.85em;word-break:break-all;">${jobReqsHash}</code></p>
+                `;
+                
+                if (data.ml.job_requirements_raw) {
+                    contextHTML += `
+                        <p><strong>Job Requirements Text:</strong></p>
+                        <div style="background:#f5f5f5;padding:0.75rem;border-radius:0.5rem;max-height:200px;overflow-y:auto;border-left:3px solid var(--accent);">
+                            ${data.ml.job_requirements_raw.split('\n').map(line => `<p style="margin:0.25rem 0;">${line}</p>`).join('')}
+                        </div>
+                    `;
+                }
+            }
+            
+            contextEl.innerHTML = contextHTML;
+        }
         
         // AI Summary (from markdown) - Make it more detailed
         const aiSummaryEl = document.getElementById('ai-summary');

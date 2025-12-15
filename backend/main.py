@@ -349,17 +349,41 @@ async def analyze_resume(request: AnalyzeRequest):
         if request.enable_llm_analysis:
             logger.info("Step 3: LLM analysis...")
             try:
-                # Log if job requirements provided
-                if request.job_requirements:
-                    logger.info(f"Job requirements provided ({len(request.job_requirements)} chars)")
+                # ==== MANDATORY JOB REQUIREMENTS VALIDATION ====
+                job_reqs_text = request.job_requirements or ""
+                
+                if job_reqs_text.strip():
+                    job_word_count = len(job_reqs_text.split())
+                    logger.info(f"✓ Job requirements provided: {job_word_count} words, {len(job_reqs_text)} chars")
+                    all_logs.append(f"[JOB_REQS] Provided: {job_word_count} words")
+                else:
+                    logger.info("⚠ No job requirements provided - will perform generic analysis")
+                    all_logs.append("[JOB_REQS] None provided - generic analysis mode")
                 
                 llm_analysis = llm_analyzer.analyze(
                     resume_json=resume_json,
                     resume_markdown=resume_markdown,
                     raw_text=request.extracted_text,
-                    job_requirements=request.job_requirements
+                    job_requirements=job_reqs_text
                 )
                 all_logs.extend(llm_analysis.get("logs", []))
+                
+                # ==== VERIFY JOB REQUIREMENTS WERE USED ====
+                if llm_analysis:
+                    job_used = llm_analysis.get("job_requirements_used", False)
+                    job_hash = llm_analysis.get("job_requirements_hash", "")
+                    
+                    if job_reqs_text.strip():
+                        if job_used:
+                            logger.info(f"✓ Job requirements ENFORCED in analysis (hash: {job_hash[:8]}...)")
+                            all_logs.append(f"[VERIFICATION] Job requirements successfully integrated")
+                        else:
+                            logger.warning(f"⚠ Job requirements may not have been fully used (hash: {job_hash[:8]}...)")
+                            all_logs.append(f"[WARNING] Job requirements analysis may be incomplete")
+                    else:
+                        logger.info("ℹ Generic analysis mode (no job requirements)")
+                        all_logs.append("[INFO] Generic analysis completed")
+                
             except Exception as e:
                 logger.warning(f"LLM analysis failed: {e}, continuing...")
                 all_logs.append(f"[WARNING] LLM analysis failed: {e}")

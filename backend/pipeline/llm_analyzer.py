@@ -107,7 +107,14 @@ class LLMAnalyzer:
             return self._heuristic_analysis(resume_json)
     
     def _call_llm(self, prompt: str) -> str:
-        """Call LLM with prompt using streaming for real-time output"""
+        """
+        Call LLM with prompt using streaming for real-time output
+        
+        ENFORCEMENT:
+        - Ollama: temperature ≤ 0.3 (deterministic)
+        - Ollama: format=json (structured output)
+        - Streaming mode (no buffering)
+        """
         try:
             if self.provider == "openai":
                 response = self.client.chat.completions.create(
@@ -116,17 +123,22 @@ class LLMAnalyzer:
                         {"role": "system", "content": "You are an expert resume analyst and HR consultant."},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.7,
-                    max_tokens=2000
+                    temperature=0.3,  # ENFORCED: Low temperature for deterministic output
+                    max_tokens=2500
                 )
                 return response.choices[0].message.content
             
             elif self.provider == "ollama":
+                # MANDATORY ENFORCEMENT FOR OLLAMA
+                self._log(f"[LLM] Calling Ollama with deterministic settings (temp=0.3, format=json)")
+                
                 # Use streaming mode for unbuffered real-time output
                 response = self.client.generate(
                     model=self.model,
                     prompt=prompt,
-                    stream=True  # Enable streaming
+                    stream=True,                  # ENFORCED: Streaming enabled
+                    temperature=0.3,              # ENFORCED: Low temperature for consistency
+                    format="json"                 # ENFORCED: Structured JSON output
                 )
                 
                 # Accumulate streamed response
@@ -138,6 +150,7 @@ class LLMAnalyzer:
                     else:
                         full_response += str(chunk)
                 
+                self._log(f"[LLM] Response received: {len(full_response)} chars")
                 return full_response
             
             else:
@@ -150,49 +163,106 @@ class LLMAnalyzer:
             raise
     
     def _build_analysis_prompt(self, resume_markdown: str, job_requirements: str = None) -> str:
-        """Build analysis prompt for LLM"""
+        """
+        Build analysis prompt for LLM with MANDATORY job requirements enforcement
         
-        job_section = ""
-        if job_requirements:
-            job_section = f"""
-TARGET JOB REQUIREMENTS:
+        This prompt MUST be used with:
+        - Structured JSON output (format=json in Ollama)
+        - Low temperature (≤ 0.3) for consistency
+        - All sections must reference job alignment
+        """
+        
+        # ==== MANDATORY JOB REQUIREMENTS SECTION ====
+        job_requirements_section = ""
+        job_used_instruction = ""
+        
+        if job_requirements and job_requirements.strip():
+            job_requirements_section = f"""
+=== TARGET JOB REQUIREMENTS (DO NOT IGNORE - MANDATORY) ===
 {job_requirements}
-
-TASK: Evaluate the candidate's fit for THIS SPECIFIC JOB. Highlight gaps and alignment.
+=== END OF JOB REQUIREMENTS ===
+"""
+            job_used_instruction = """
+CRITICAL ENFORCEMENT:
+- Every single section of your output MUST explicitly reference alignment to the target job
+- Do NOT generate a generic resume summary
+- PENALIZE missing required skills (reduce scores appropriately)
+- EXPLAIN ALL MISMATCHES explicitly
+- If a skill is required but missing, highlight it as a CRITICAL GAP
+- If a skill is present and required, highlight it as a MATCHED STRENGTH
+- Your final verdict MUST explicitly state job fit (YES, MAYBE, or NO)
+"""
+        else:
+            job_requirements_section = """
+=== NO JOB REQUIREMENTS PROVIDED ===
+Candidate will receive GENERIC analysis without job-specific alignment.
+"""
+            job_used_instruction = """
+NOTE: No job requirements were provided.
+This is a GENERIC resume analysis without job-specific fit assessment.
 """
         
-        prompt = f"""
-Analyze the following resume{' relative to the job requirements' if job_requirements else ''}:
+        # ==== STRUCTURED OUTPUT REQUIREMENTS ====
+        prompt = f"""RESUME ANALYSIS - STRUCTURED OUTPUT (JSON ONLY)
 
+{job_requirements_section}
+
+CANDIDATE RESUME:
 {resume_markdown}
-{job_section}
 
-Please provide your analysis in the following JSON structure:
+{job_used_instruction}
+
+INSTRUCTIONS:
+1. Analyze ONLY the provided resume
+2. Reference the job requirements in EVERY major section
+3. Output MUST be valid JSON with the exact structure below
+4. Do not include any markdown, explanations, or text outside JSON
+5. All scores must be 0-100 integers
+6. All arrays must contain strings
+
+OUTPUT MUST BE VALID JSON IN THIS EXACT STRUCTURE:
 {{
-    "executive_summary": "1-2 sentence overall assessment",
-    "strengths": ["strength 1", "strength 2", ...],
-    "weaknesses": ["weakness 1", "weakness 2", ...],
-    "opportunities": ["opportunity 1", ...],
-    {"gap_analysis": {"required_skills": ["...", ], "missing_skills": ["...", ]}, " if job_requirements else ""}
-    "technical_fit": {{"score": 0-100, "explanation": "..."}},
-    "cultural_fit": {{"score": 0-100, "explanation": "..."}},
+    "job_requirements_analyzed": {"true" if job_requirements and job_requirements.strip() else "false"},
+    "executive_summary": "2-3 sentence assessment of overall fit relative to job (or generic if no job provided)",
+    "job_alignment_summary": "Paragraph explaining how resume aligns or misaligns with job requirements",
+    "matched_requirements": [
+        {{"requirement": "Required Skill", "evidence": "How/where it appears in resume", "strength": "brief assessment"}}
+    ],
+    "missing_requirements": [
+        {{"requirement": "Required Skill", "impact": "why missing matters", "severity": "CRITICAL|HIGH|MEDIUM"}}
+    ],
+    "strengths": ["strength 1", "strength 2", "strength 3"],
+    "weaknesses": ["weakness 1", "weakness 2"],
+    "opportunities": ["improvement 1", "improvement 2"],
+    "technical_fit": {{"score": 0-100, "explanation": "Technical skill alignment to job"}},
+    "cultural_fit": {{"score": 0-100, "explanation": "Cultural/experience alignment to job"}},
     "seniority_level": "junior|mid|senior|lead|executive",
-    "recommended_roles": ["role 1", "role 2", ...],
-    "missing_skills": ["skill 1", "skill 2", ...],
-    "key_achievements": ["achievement 1", ...],
-    {"hire_recommendation": "YES|MAYBE|NO (relative to job)" if job_requirements else ""}
+    "role_fit_verdict": {{"recommendation": "YES|MAYBE|NO", "confidence": 0-100, "rationale": "Why this recommendation"}},
+    "recommended_roles": ["role 1", "role 2"],
+    "critical_gaps": ["gap 1", "gap 2"],
+    "key_achievements": ["achievement 1", "achievement 2"],
     "overall_score": 0-100,
-    "key_metrics": {{"experience_years": X, "skills_count": Y, ...}}
+    "key_metrics": {{"years_experience": 0, "skills_count": 0, "education_count": 0}}
 }}
 
-Be specific, data-driven, and constructive. {
-    'Focus on job-specific fit and explicitly explain why this candidate is suitable or not for the role.' if job_requirements else ''
-}
+VALIDATION RULES:
+- If job requirements were provided, role_fit_verdict MUST address job fit, not generic fit
+- If job requirements were NOT provided, state this in job_alignment_summary
+- All scores MUST be integers 0-100
+- All strings must be under 500 characters
+- No nested objects beyond what's shown
+- Matched/missing requirements arrays CAN be empty if not applicable
 """
         return prompt
     
     def _parse_analysis(self, response_text: str, resume_json: Dict, job_requirements: str = None) -> Dict:
-        """Parse LLM response"""
+        """
+        Parse LLM response with MANDATORY verification of job requirements usage
+        
+        Returns analysis dict with job_requirements_used and job_requirements_hash flags
+        """
+        import hashlib
+        
         try:
             # Try to extract JSON from response
             import json
@@ -207,13 +277,49 @@ Be specific, data-driven, and constructive. {
             else:
                 analysis = self._heuristic_analysis(resume_json, job_requirements)
             
+            # ==== MANDATORY: Add job requirements verification flags ====
+            job_requirements_raw = job_requirements or ""
+            job_requirements_hash = hashlib.sha256(job_requirements_raw.encode()).hexdigest()
+            
+            # Verify job requirements were actually used
+            job_requirements_used = False
+            if job_requirements and job_requirements.strip():
+                # Check if LLM referenced job requirements in analysis
+                job_referenced = (
+                    analysis.get("job_requirements_analyzed") == True or
+                    "job_alignment_summary" in analysis and analysis["job_alignment_summary"] and 
+                    len(analysis["job_alignment_summary"]) > 20
+                )
+                job_requirements_used = job_referenced
+                self._log(f"[VERIFICATION] Job requirements used: {job_requirements_used}")
+            
+            # Add mandatory fields
+            analysis["job_requirements_used"] = job_requirements_used
+            analysis["job_requirements_hash"] = job_requirements_hash
+            analysis["job_requirements_raw"] = job_requirements_raw
+            
+            # If job requirements were provided but not used, mark as warning
+            if job_requirements and job_requirements.strip() and not job_requirements_used:
+                self._log("[WARNING] Job requirements were provided but may not have been properly analyzed", "WARNING")
+                analysis["job_requirements_warning"] = True
+            
             analysis["logs"] = self.logs
             analysis["success"] = True
             return analysis
         
         except Exception as e:
             self._log(f"Failed to parse LLM response: {e}", "WARNING")
-            return self._heuristic_analysis(resume_json, job_requirements)
+            # Return heuristic analysis with verification flags
+            analysis = self._heuristic_analysis(resume_json, job_requirements)
+            
+            # Add verification flags even for heuristic analysis
+            job_requirements_raw = job_requirements or ""
+            job_requirements_hash = hashlib.sha256(job_requirements_raw.encode()).hexdigest()
+            analysis["job_requirements_used"] = False
+            analysis["job_requirements_hash"] = job_requirements_hash
+            analysis["job_requirements_raw"] = job_requirements_raw
+            
+            return analysis
     
     def _heuristic_analysis(self, resume_json: Dict, job_requirements: str = None) -> Dict:
         """
