@@ -83,7 +83,7 @@ class ResumeReconstructor:
         self.logs = []
         
         # Build structured data
-        resume_json = self._build_json(raw_text, nlp_data, sections)
+        resume_json = self._build_resume_json(raw_text, nlp_data, sections)
         
         # Generate markdown
         markdown = self._generate_markdown(resume_json, raw_text)
@@ -99,24 +99,52 @@ class ResumeReconstructor:
         
         return result
     
-    def _build_json(self, 
-                   raw_text: str,
-                   nlp_data: Dict,
-                   sections: Optional[Dict]) -> ResumeJSON:
+    def _build_resume_json(self, raw_text: str, 
+                            nlp_data: Dict,
+                            sections: Optional[Dict]) -> ResumeJSON:
         """Build structured JSON from extracted data"""
         resume = ResumeJSON()
         
-        # Extract name from persons entities or first line
+        # Extract name from persons entities or first line with multiple strategies
         persons = nlp_data.get("entities", {}).get("persons", [])
+        name_found = False
+        
+        # Strategy 1: Use SpaCy PERSON entity
         if persons and len(persons) > 0:
-            # Use first person entity as name
             first_person = persons[0]
-            resume.name = first_person.get("text", "") if isinstance(first_person, dict) else first_person
-        else:
-            # Fallback: use first line of text if it looks like a name (short and no special chars)
-            first_line = raw_text.split('\n')[0].strip()
-            if first_line and len(first_line) < 50 and not any(char in first_line for char in ['@', 'http', ':', '=']):
-                resume.name = first_line
+            candidate_name = first_person.get("text", "") if isinstance(first_person, dict) else str(first_person)
+            if candidate_name and len(candidate_name.strip()) > 0:
+                resume.name = candidate_name.strip()
+                name_found = True
+        
+        # Strategy 2: Extract from first few lines (capitalized words pattern)
+        if not name_found:
+            lines = raw_text.split('\n')
+            for i, line in enumerate(lines[:5]):  # Check first 5 lines
+                line = line.strip()
+                # Look for capitalized words that could be a name
+                # Must be 2-4 words, all starting with capital letters, no special chars
+                if line and 10 < len(line) < 60:
+                    words = line.split()
+                    if 2 <= len(words) <= 4:
+                        # Check if all words start with capital and contain only letters
+                        if all(w[0].isupper() and w.replace('-', '').replace("'", '').isalpha() for w in words if w):
+                            # Avoid lines with common resume keywords
+                            lowercase_line = line.lower()
+                            if not any(keyword in lowercase_line for keyword in 
+                                     ['resume', 'cv', 'curriculum', 'vitae', 'phone', 'email', '@', 'http', 'experience', 'education']):
+                                resume.name = line
+                                name_found = True
+                                break
+        
+        # Strategy 3: Fallback to first non-empty line if it looks like a name
+        if not name_found:
+            for line in raw_text.split('\n')[:3]:
+                line = line.strip()
+                if line and 5 < len(line) < 50 and not any(char in line for char in ['@', 'http', ':', '=', '|']):
+                    resume.name = line
+                    name_found = True
+                    break
         
         # Contact information
         contact_data = nlp_data.get("entities", {}).get("contact", {})
