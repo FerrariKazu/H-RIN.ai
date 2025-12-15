@@ -1,3 +1,4 @@
+<initial_code>
 // Get API URL from window or default to localhost:8002
 let API_URL = window.VITE_API_URL || "http://localhost:8002";
 
@@ -262,22 +263,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const batchResult = await batchRes.json();
             state.batchResults = batchResult;
             
-            addLog(`✅ Batch analysis complete`);
-            addLog(`📊 Results: ${batchResult.documents.length} documents processed`);
+            addLog(`✅ Analysis complete`);
             
-            // Update statuses
-            batchResult.documents.forEach((doc, idx) => {
-                const status = doc.status === 'success' ? 'completed' : 'failed';
-                updateQueueStatus(idx, status);
+            // Handle both single-CV and batch responses
+            const mode = batchResult.mode || "batch";
+            
+            if (mode === "single") {
+                // Single-CV mode: one candidate
+                const candidate = batchResult.candidate || {};
+                const score = candidate.llm_analysis?.overall_score || 'N/A';
+                addLog(`📊 Single-CV Analysis: ${candidate.filename}`);
+                addLog(`✓ LLM Score: ${score}/100`);
+                updateQueueStatus(0, 'completed');
+            } else {
+                // Batch mode: multiple documents
+                const documents = batchResult.documents || [];
+                addLog(`📊 Batch Results: ${documents.length} documents processed`);
                 
-                if (doc.status === 'success') {
-                    addLog(`✓ ${doc.filename}: LLM Score ${doc.analysis?.llm_analysis?.overall_score || 'N/A'}/100`);
-                } else {
-                    addLog(`✗ ${doc.filename}: ${doc.error || 'Analysis failed'}`);
-                }
-            });
+                // Update statuses
+                documents.forEach((doc, idx) => {
+                    const status = doc.status === 'success' ? 'completed' : 'failed';
+                    updateQueueStatus(idx, status);
+                    
+                    if (doc.status === 'success') {
+                        addLog(`✓ ${doc.filename}: LLM Score ${doc.analysis?.llm_analysis?.overall_score || 'N/A'}/100`);
+                    } else {
+                        addLog(`✗ ${doc.filename}: ${doc.error || 'Analysis failed'}`);
+                    }
+                });
+            }
             
-            // Render batch results
+            // Render results (handles both modes)
             renderBatchResults(batchResult);
             updateStatus("Batch Complete", "var(--success)");
             addLog("🎉 Batch Analysis Finished Successfully");
@@ -295,15 +311,99 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Render Batch Results - Display comparison view (PASS 1 + PASS 2)
     function renderBatchResults(batchResult) {
-        const comparisonTable = document.getElementById('comparison-table');
-        if (!comparisonTable) {
-            addLog("❌ Comparison table element not found");
+        // STEP 1: Check response mode
+        const mode = batchResult.mode || "batch";  // Default to batch for backwards compatibility
+        const comparisonSection = document.getElementById('batch-comparison');
+        
+        if (!comparisonSection) {
+            addLog("❌ Batch comparison section not found");
             return;
         }
 
+        // SINGLE-CV MODE: Display full candidate analysis, hide comparison UI
+        if (mode === "single") {
+            addLog(`📄 SINGLE-CV MODE: Full candidate analysis (no comparative)`, "info");
+            
+            const candidate = batchResult.candidate || {};
+            const llmAnalysis = candidate.llm_analysis || {};
+            
+            let html = `
+                <h2>Candidate Analysis</h2>
+                
+                <div class="card">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <strong>Candidate Name:</strong><br>
+                            ${llmAnalysis.candidate_name || candidate.filename || "Unknown"}
+                        </div>
+                        <div>
+                            <strong>Seniority Level:</strong><br>
+                            ${llmAnalysis.seniority_level || "Not assessed"}
+                        </div>
+                    </div>
+                    
+                    <div style="background: #f5f5f5; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                        <strong>Executive Summary:</strong>
+                        <p>${llmAnalysis.executive_summary || "No summary available"}</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <strong>Overall Score: </strong>
+                            <div style="font-size: 2.5rem; font-weight: bold; color: ${getScoreColor(llmAnalysis.overall_score || 0)};">
+                                ${llmAnalysis.overall_score || 0}/100
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Fit Assessment:</strong><br>
+                            ${llmAnalysis.role_fit_verdict?.recommendation || "Pending"}<br>
+                            <small>${llmAnalysis.role_fit_verdict?.rationale || ""}</small>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong>Strengths:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${(llmAnalysis.strengths || []).map(s => `<span class="skill-tag matched">${s}</span>`).join("")}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong>Weaknesses:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${(llmAnalysis.weaknesses || []).map(s => `<span class="skill-tag missing">${s}</span>`).join("")}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong>Recommended Roles:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${(llmAnalysis.recommended_roles || []).map(r => `<span class="badge badge-success">${r}</span>`).join("")}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <strong>Critical Gaps:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${(llmAnalysis.critical_gaps || []).map(g => `<span class="skill-tag missing">⚠ ${g}</span>`).join("")}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            comparisonSection.innerHTML = html;
+            comparisonSection.style.display = 'block';
+            
+            addLog(`✅ Single-CV analysis complete for: ${candidate.filename || "Resume"}`);
+            return;
+        }
+
+        // BATCH MODE: Display comparison table and comparative analysis
+        addLog(`📊 BATCH MODE: Displaying ${batchResult.documents_count} candidates with comparison`);
+        
         const documents = batchResult.documents || [];
         if (documents.length === 0) {
-            comparisonTable.innerHTML = '<p>No documents processed</p>';
+            comparisonSection.innerHTML = '<p>No documents processed</p>';
             return;
         }
 
@@ -312,31 +412,39 @@ document.addEventListener('DOMContentLoaded', function() {
         state.batchSortBy = 'score';
         state.comparativeAnalysis = batchResult.comparative_analysis || null;
 
-        // PASS 1: Render individual candidate results
-        renderComparisonView(documents);
-
-        // PASS 2: Render comparative analysis if available
-        if (batchResult.comparative_analysis && documents.length > 1) {
-            renderComparativeAnalysis(batchResult.comparative_analysis, documents);
-            addLog(`✅ PASS 2 Complete: Comparative analysis generated for ${documents.length} candidates`);
-        } else if (documents.length === 1) {
-            addLog(`ℹ Single candidate - comparative analysis not applicable`);
-        }
-
-        // Show comparison section
-        const comparisonSection = document.getElementById('batch-comparison');
-        if (comparisonSection) {
-            comparisonSection.style.display = 'block';
-        }
-
-        addLog(`📊 Displaying PASS 1 + PASS 2 results for ${documents.length} candidate(s)`);
-    }
-
-    function renderComparisonView(documents) {
-        const comparisonTable = document.getElementById('comparison-table');
-        if (!comparisonTable) return;
-
+        // Create container for comparison table
         let html = `
+            <div id="comparison-table-container">
+                <h2>Batch Analysis Results</h2>
+        `;
+
+        // PASS 1: Render individual candidate results
+        html += renderComparisonViewHTML(documents);
+
+        // PASS 2: Render comparative analysis if available (batch mode with 2+ candidates)
+        if (batchResult.comparative_analysis && documents.length > 1) {
+            html += renderComparativeAnalysisHTML(batchResult.comparative_analysis, documents);
+            addLog(`✅ PASS 2 Complete: Comparative analysis for ${documents.length} candidates`);
+        } else if (documents.length === 1) {
+            addLog(`ℹ Single candidate batch - skipping PASS 2`);
+        }
+
+        html += `</div>`;
+        comparisonSection.innerHTML = html;
+        comparisonSection.style.display = 'block';
+
+        addLog(`📊 Rendering results for ${documents.length} candidate(s)`);
+    }
+    
+    function getScoreColor(score) {
+        if (score >= 75) return '#4CAF50';  // Green
+        if (score >= 50) return '#FF9800';  // Orange
+        return '#F44336';  // Red
+    }
+    
+    function renderComparisonViewHTML(documents) {
+        let html = `
+            <h3>PASS 1: Individual Candidate Analysis</h3>
             <table class="comparison-table">
                 <thead>
                     <tr>
@@ -405,11 +513,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </tbody>
             </table>
         `;
-
-        comparisonTable.innerHTML = html;
+        
+        return html;
     }
-
-    function renderComparativeAnalysis(comparativeData, documents) {
+    
+    function renderComparativeAnalysisHTML(comparativeData, documents) {
         // Create or get comparative analysis section
         let compSection = document.getElementById('comparative-analysis-section');
         if (!compSection) {
@@ -464,7 +572,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             <tr style="border-bottom: 1px solid var(--border);">
                                 <td style="padding: 0.5rem; font-weight: bold; color: var(--accent);">🥇 #${rankNum}</td>
                                 <td style="padding: 0.5rem;">${name}</td>
-                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">${score}/100</td>
+                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
+                                    ${score}/100
+                                </td>
                             </tr>
             `;
         });
@@ -474,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </table>
                 </div>
 
-                <!-- Strongest Candidate -->
+                <!-- Top Candidate -->
                 <div>
                     <h4>🏆 Top Candidate</h4>
                     <div style="background: var(--bg-card); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border);">
@@ -1200,3 +1310,351 @@ window.onclick = function(event) {
         event.target.style.display = 'none';
     }
 }
+</initial_code>
+<edited_code>
+      function renderComparativeAnalysisHTML(comparativeData, documents) {
+          // Only render if we have actual comparative data
+          if (!comparativeData || !comparativeData.comparative_ranking || comparativeData.comparative_ranking.length === 0) {
+              return '';
+          }
+          
+          const ranking = comparativeData.comparative_ranking || [];
+          const strengths = comparativeData.strengths_comparison || '';
+          const weaknesses = comparativeData.weaknesses_comparison || '';
+          const skillMatrix = comparativeData.skill_coverage_matrix || {};
+          const strongest = comparativeData.strongest_candidate || {};
+          const hiring = comparativeData.hiring_recommendations || {};
+          const executive = comparativeData.executive_summary || '';
+
+          // New comprehensive fields
+          const candidateProfiles = comparativeData.candidate_profiles || [];
+          const experienceSummaries = comparativeData.experience_summaries || [];
+          const skillsAndEntities = comparativeData.skills_and_entities || [];
+          const aiFitScores = comparativeData.ai_fit_scores || [];
+          const evaluationFactors = comparativeData.evaluation_factors || [];
+          const recommendedRoles = comparativeData.recommended_roles || [];
+
+          let html = `
+              <h3 style="margin-top: 2rem;"><i data-lucide="trending-up"></i> PASS 2: Cross-Candidate Comparative Analysis</h3>
+              
+              <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                  <strong>AI Executive Summary:</strong>
+                  <p>${executive}</p>
+              </div>
+
+              <!-- Candidate Profiles -->
+              <div style="margin: 2rem 0;">
+                  <h4>👥 Candidate Profiles (AI-Generated Comparative)</h4>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+          `;
+          
+          candidateProfiles.forEach(profile => {
+              const docId = profile.document_id || 'Unknown';
+              const name = profile.name || 'Unknown';
+              const summary = profile.summary || 'No summary available';
+              const seniority = profile.seniority_level || 'mid';
+              const yearsExp = profile.years_experience || 0;
+              const compared = profile.compared_to_others || '';
+              
+              html += `
+                      <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid var(--accent);">
+                          <strong style="color: var(--accent);">${name}</strong>
+                          <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0;">
+                              ${seniority} | ${yearsExp} years experience
+                          </p>
+                          <p style="font-size: 0.9rem; margin-top: 0.5rem;">${summary}</p>
+                          ${compared ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic;">
+                              📊 ${compared}
+                          </p>` : ''}
+                      </div>
+              `;
+          });
+          
+          html += `
+                  </div>
+              </div>
+
+              <!-- Experience Summaries -->
+              <div style="margin: 2rem 0;">
+                  <h4>💼 Experience Analysis (Comparative)</h4>
+          `;
+          
+          experienceSummaries.forEach(expSum => {
+              const docId = expSum.document_id || 'Unknown';
+              const candidate = documents.find(d => d.document_id === docId);
+              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+              const expQuality = expSum.experience_quality || 'Not assessed';
+              const keyPositions = expSum.key_positions || [];
+              const compStrength = expSum.comparative_strength || '';
+              
+              html += `
+                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
+                          <strong>${name}</strong>
+                          <p style="margin: 0.5rem 0;">${expQuality}</p>
+                          ${keyPositions.length > 0 ? `<p style="font-size: 0.9rem; color: var(--text-secondary);">
+                              <strong>Key Roles:</strong> ${keyPositions.join(', ')}
+                          </p>` : ''}
+                          ${compStrength ? `<p style="font-size: 0.9rem; color: var(--accent); margin-top: 0.5rem; font-style: italic;">
+                              📊 ${compStrength}
+                          </p>` : ''}
+                      </div>
+              `;
+          });
+          
+          html += `
+              </div>
+
+              <!-- Skills & Entities (Certificates, Skills) -->
+              <div style="margin: 2rem 0;">
+                  <h4>🎯 Skills & Entities Comparison</h4>
+          `;
+          
+          skillsAndEntities.forEach(skillData => {
+              const docId = skillData.document_id || 'Unknown';
+              const candidate = documents.find(d => d.document_id === docId);
+              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+              const techSkills = skillData.technical_skills || [];
+              const softSkills = skillData.soft_skills || [];
+              const certs = skillData.certifications || [];
+              const uniqueSkills = skillData.unique_skills || [];
+              const gaps = skillData.skill_gaps || [];
+              
+              html += `
+                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem;">
+                          <strong style="color: var(--accent);">${name}</strong>
+                          
+                          ${techSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong>Technical Skills:</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${techSkills.map(skill => `<span class="skill-tag matched">${skill}</span>`).join(' ')}
+                              </div>
+                          </div>` : ''}
+                          
+                          ${softSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong>Soft Skills:</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${softSkills.map(skill => `<span class="skill-tag" style="background: rgba(61, 169, 250, 0.2);">${skill}</span>`).join(' ')}
+                              </div>
+                          </div>` : ''}
+                          
+                          ${certs.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong>Certifications:</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${certs.map(cert => `<span class="badge badge-success">📜 ${cert}</span>`).join(' ')}
+                              </div>
+                          </div>` : ''}
+                          
+                          ${uniqueSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong>Unique Skills (vs others):</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${uniqueSkills.map(skill => `<span class="skill-tag" style="background: rgba(255, 193, 7, 0.2); border-color: #ffc107;">⭐ ${skill}</span>`).join(' ')}
+                              </div>
+                          </div>` : ''}
+                          
+                          ${gaps.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong>Skill Gaps (vs others):</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${gaps.map(gap => `<span class="skill-tag missing">⚠ ${gap}</span>`).join(' ')}
+                              </div>
+                          </div>` : ''}
+                      </div>
+              `;
+          });
+          
+          html += `
+              </div>
+
+              <!-- AI Fit Scores & Evaluation Factors -->
+              <div style="margin: 2rem 0;">
+                  <h4>📊 AI Fit Scores & Evaluation Factors</h4>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
+          `;
+          
+          aiFitScores.forEach(scoreData => {
+              const docId = scoreData.document_id || 'Unknown';
+              const candidate = documents.find(d => d.document_id === docId);
+              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+              const overallScore = scoreData.overall_fit_score || 0;
+              const comparedToGroup = scoreData.compared_to_group || 'average';
+              const scoreBreakdown = scoreData.score_breakdown || {};
+              const whyScore = scoreData.why_this_score || 'No explanation provided';
+              
+              // Find evaluation factors for this candidate
+              const evalFactor = evaluationFactors.find(ef => ef.document_id === docId) || {};
+              const strengths = evalFactor.strengths || [];
+              const weaknesses = evalFactor.weaknesses || [];
+              const opportunities = evalFactor.opportunities || [];
+              const compAdvantages = evalFactor.comparative_advantages || [];
+              const compDisadvantages = evalFactor.comparative_disadvantages || [];
+              
+              const scoreColor = getScoreColor(overallScore);
+              
+              html += `
+                      <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid ${scoreColor};">
+                          <strong style="color: ${scoreColor};">${name}</strong>
+                          <div style="font-size: 2rem; font-weight: bold; color: ${scoreColor}; margin: 0.5rem 0;">
+                              ${overallScore}/100
+                          </div>
+                          <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                              <strong>vs Group:</strong> ${comparedToGroup}
+                          </p>
+                          
+                          ${Object.keys(scoreBreakdown).length > 0 ? `<div style="margin-top: 1rem; font-size: 0.85rem;">
+                              <strong>Score Breakdown:</strong>
+                              <div style="margin-top: 0.5rem;">
+                                  ${Object.entries(scoreBreakdown).map(([key, value]) => 
+                                      `<div style="display: flex; justify-content: space-between; margin: 0.25rem 0;">
+                                          <span>${key.replace(/_/g, ' ')}:</span>
+                                          <span style="font-weight: bold;">${value}/100</span>
+                                      </div>`
+                                  ).join('')}
+                              </div>
+                          </div>` : ''}
+                          
+                          <p style="font-size: 0.9rem; margin-top: 1rem; font-style: italic;">
+                              ${whyScore}
+                          </p>
+                          
+                          ${strengths.length > 0 ? `<div style="margin-top: 1rem;">
+                              <strong style="color: #4CAF50;">Strengths:</strong>
+                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                                  ${strengths.map(s => `<li>${s}</li>`).join('')}
+                              </ul>
+                          </div>` : ''}
+                          
+                          ${weaknesses.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong style="color: #F44336;">Weaknesses:</strong>
+                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                                  ${weaknesses.map(w => `<li>${w}</li>`).join('')}
+                              </ul>
+                          </div>` : ''}
+                          
+                          ${compAdvantages.length > 0 ? `<div style="margin-top: 0.75rem;">
+                              <strong style="color: var(--accent);">Comparative Advantages:</strong>
+                              <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
+                                  ${compAdvantages.map(ca => `<li>⭐ ${ca}</li>`).join('')}
+                              </ul>
+                          </div>` : ''}
+                      </div>
+              `;
+          });
+          
+          html += `
+                  </div>
+              </div>
+
+              <!-- Recommended Roles (AI-Generated, Minimum 5 per candidate) -->
+              <div style="margin: 2rem 0;">
+                  <h4>💼 AI-Recommended Roles (Comparative Analysis)</h4>
+          `;
+          
+          recommendedRoles.forEach(roleData => {
+              const docId = roleData.document_id || 'Unknown';
+              const candidate = documents.find(d => d.document_id === docId);
+              const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
+              const roles = roleData.roles || [];
+              
+              html += `
+                      <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
+                          <strong style="color: var(--accent);">${name}</strong>
+                          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
+          `;
+          
+          roles.forEach((role, idx) => {
+              const title = role.title || 'Unknown Role';
+              const fitScore = role.fit_score || 0;
+              const why = role.why_good_fit || '';
+              const compared = role.compared_to_others || '';
+              const roleColor = fitScore >= 75 ? '#4CAF50' : fitScore >= 50 ? '#FF9800' : '#F44336';
+              
+              html += `
+                              <div style="background: rgba(61, 169, 250, 0.05); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+                                  <div style="font-weight: bold; margin-bottom: 0.5rem;">${title}</div>
+                                  <div style="color: ${roleColor}; font-weight: bold; margin-bottom: 0.5rem;">
+                                      Fit: ${fitScore}/100
+                                  </div>
+                                  ${why ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                      ${why}
+                                  </p>` : ''}
+                                  ${compared ? `<p style="font-size: 0.8rem; color: var(--accent); font-style: italic;">
+                                      📊 ${compared}
+                                  </p>` : ''}
+                              </div>
+              `;
+          });
+          
+          html += `
+                          </div>
+                      </div>
+              `;
+          });
+          
+          html += `
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
+                  <!-- Comparative Ranking -->
+                  <div>
+                      <h4>📊 Final Ranking (Normalized)</h4>
+                      <table style="width: 100%; font-size: 0.9rem;">
+                          <thead>
+                              <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
+                                  <th style="padding: 0.5rem; text-align: left;">Rank</th>
+                                  <th style="padding: 0.5rem; text-align: left;">Candidate</th>
+                                  <th style="padding: 0.5rem; text-align: right;">Score</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+          `;
+
+          ranking.forEach(item => {
+              const docId = item.document_id;
+              const candidate = documents.find(d => d.document_id === docId);
+              const candidateName = candidate?.analysis?.llm_analysis?.candidate_name || candidate?.filename || docId;
+              const scoreColor = getScoreColor(item.normalized_fit_score || 0);
+              
+              html += `
+                              <tr>
+                                  <td style="padding: 0.5rem; font-weight: bold;">#${item.rank}</td>
+                                  <td style="padding: 0.5rem;">${candidateName}</td>
+                                  <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
+                                      ${item.normalized_fit_score}/100
+                                  </td>
+                              </tr>
+                              <tr>
+                                  <td colspan="3" style="padding: 0.5rem; font-size: 0.85rem; color: #666; border-bottom: 1px solid var(--border);">
+                                      ${item.rationale || ''}
+                                  </td>
+                              </tr>
+              `;
+          });
+
+          html += `
+                          </tbody>
+                      </table>
+                  </div>
+                  
+                  <!-- Top Candidate -->
+                  <div>
+                      <h4>🏆 Top Candidate</h4>
+                      <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #4CAF50;">
+                          <strong>${strongest.reason || 'Best overall fit'}</strong>
+                      </div>
+                  </div>
+              </div>
+              
+              <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                  <h4>💪 Strengths Comparison</h4>
+                  <p>${strengths || 'No strengths comparison available'}</p>
+              </div>
+              
+              <div style="background: rgba(244, 67, 54, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                  <h4>⚠ Weaknesses Comparison</h4>
+                  <p>${weaknesses || 'No weaknesses comparison available'}</p>
+              </div>
+          `;
+          
+          return html;
+      }
+
+</edited_code>

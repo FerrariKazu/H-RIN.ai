@@ -196,8 +196,19 @@ class ComparativeAnalysisResult(BaseModel):
     hiring_recommendations: Dict = {}
     executive_summary: str = ""
 
+class SingleCVResponse(BaseModel):
+    """Response for single CV analysis (PASS 1 ONLY)"""
+    mode: str = "single"
+    batch_id: str
+    job_requirements: str
+    job_requirements_used: bool
+    candidate: Dict  # Single candidate's PASS 1 analysis
+    processing_time: float
+    success: bool
+
 class BatchAnalyzeResponse(BaseModel):
-    """Batch analysis response model with PASS 1 + PASS 2"""
+    """Response for batch analysis (PASS 1 + optional PASS 2)"""
+    mode: str = "batch"
     batch_id: str
     job_requirements: str
     documents: List[DocumentResult]
@@ -540,12 +551,14 @@ async def batch_analyze(
     batch_id: str = ""
 ):
     """
-    Batch analyze multiple PDF resumes
+    Analyze one or more PDF resumes - AUTOMATIC MODE DETECTION
     
-    - Accepts up to 5 PDF files
-    - Processes each independently through full pipeline
-    - Applies same job requirements to all documents
-    - Returns results for each document
+    - 1 file → PASS 1 only (single-CV mode, no comparison)
+    - 2-5 files → PASS 1 + PASS 2 (batch mode with comparison)
+    
+    Response structure depends on file count:
+    - mode: "single" → {mode, batch_id, candidate, ...}
+    - mode: "batch" → {mode, batch_id, documents, comparative_analysis, ...}
     """
     check_components_ready()
     
@@ -554,26 +567,40 @@ async def batch_analyze(
     documents_results = []
     
     try:
-        # Validate file count
+        # STEP 0: INPUT NORMALIZATION - Always convert to array
         if not files or len(files) == 0:
             raise HTTPException(status_code=400, detail="No files provided")
         
-        if len(files) > 5:
+        # Normalize to list (should already be list, but ensure it)
+        file_list = list(files) if isinstance(files, (list, tuple)) else [files]
+        
+        # Validate file count
+        if len(file_list) > 5:
             raise HTTPException(status_code=400, detail="Maximum 5 files allowed per batch")
         
         # Validate all are PDFs
-        for file in files:
+        for file in file_list:
             if not file.filename.lower().endswith('.pdf'):
                 raise HTTPException(
                     status_code=400,
                     detail=f"File '{file.filename}' is not a PDF. Only PDF files are accepted."
                 )
         
-        logger.info(f"🚀 Starting batch analysis: {len(files)} files, batch_id={batch_id}")
-        logger.info(f"Job requirements provided: {len(job_requirements.split()) if job_requirements.strip() else 0} words")
+        # STEP 1: DETERMINE MODE based on file count
+        is_single_mode = len(file_list) == 1
+        mode = "single" if is_single_mode else "batch"
+        
+        logger.info(f"{'='*70}")
+        logger.info(f"🚀 Starting analysis: {len(file_list)} file(s), mode={mode}")
+        if is_single_mode:
+            logger.info(f"   ℹ SINGLE-CV MODE: PASS 1 only (no comparative analysis)")
+        else:
+            logger.info(f"   ℹ BATCH MODE: PASS 1 + PASS 2 (comparative analysis enabled)")
+        logger.info(f"   Job requirements: {len(job_requirements.split()) if job_requirements.strip() else 0} words")
+        logger.info(f"{'='*70}")
         
         # Process each file independently
-        for idx, file in enumerate(files, 1):
+        for idx, file in enumerate(file_list, 1):
             document_id = f"doc_{batch_id}_{idx}_{datetime.now().timestamp()}"
             logger.info(f"Processing document {idx}/{len(files)}: {file.filename} (ID: {document_id})")
             
@@ -612,13 +639,14 @@ async def batch_analyze(
                 resume_markdown = reconstruction_result.get("markdown", "")
                 resume_json = reconstruction_result.get("json", {})
                 
-                # Step 5: LLM Analysis with job requirements
-                logger.info(f"  [{idx}] Running LLM analysis with job requirements...")
+                # Step 5: LLM PASS 1 Analysis
+                logger.info(f"  [{idx}] Running LLM PASS 1 (single-candidate analysis)...")
                 llm_analysis = llm_analyzer.analyze(
                     resume_json=resume_json,
                     resume_markdown=resume_markdown,
                     raw_text=raw_text,
-                    job_requirements=job_requirements
+                    job_requirements=job_requirements,
+                    is_single_mode=is_single_mode  # Tell analyzer if single or batch
                 )
                 
                 logger.info(f"  [{idx}] Analysis complete - Score: {llm_analysis.get('llm_analysis', {}).get('overall_score', 'N/A')}")
@@ -673,14 +701,42 @@ async def batch_analyze(
         success_count = sum(1 for d in documents_results if d.status == "success")
         failed_count = len(documents_results) - success_count
         
-        logger.info(f"=" * 70)
+        logger.info(f"{'='*70}")
         logger.info(f"✅ PASS 1 COMPLETE: {success_count} succeeded, {failed_count} failed")
         logger.info(f"   Time: {processing_time_pass1:.2f}s")
-        logger.info(f"=" * 70)
+        logger.info(f"{'='*70}")
         
-        # PASS 2: Comparative Analysis (only if we have successful documents)
+        # STEP 2: Branch by CV count
+        # If single CV: Return immediately with PASS 1 only (NO comparative analysis)
+        if is_single_mode and success_count == 1:
+            logger.info(f"{'='*70}")
+            logger.info(f"✅ SINGLE-CV ANALYSIS COMPLETE")
+            logger.info(f"   Mode: single (no comparative analysis)")
+            logger.info(f"   Result: Full PASS 1 analysis")
+            logger.info(f"{'='*70}")
+            
+            processing_time_total = (datetime.now() - start_time).total_seconds()
+            
+            single_result = documents_results[0]
+            return SingleCVResponse(
+                mode="single",
+                batch_id=batch_id,
+                job_requirements=job_requirements,
+                job_requirements_used=bool(job_requirements.strip()),
+                candidate={
+                    "document_id": single_result.document_id,
+                    "filename": single_result.filename,
+                    "llm_analysis": single_result.analysis.get("llm_analysis", {}) if single_result.analysis else {},
+                    "resume_json": single_result.analysis.get("resume_json", {}) if single_result.analysis else {},
+                    "extraction": single_result.extraction
+                },
+                processing_time=processing_time_total,
+                success=True
+            )
+        
+        # PASS 2: Comparative Analysis (only if batch mode AND 2+ successful candidates)
         comparative_analysis = None
-        if success_count > 1:  # Only comparative if 2+ successful candidates
+        if not is_single_mode and success_count > 1:  # Only comparative if batch AND 2+ candidates
             logger.info("=" * 70)
             logger.info("🚀 STARTING PASS 2: CROSS-CANDIDATE COMPARATIVE ANALYSIS")
             logger.info(f"   Comparing {success_count} candidates...")
@@ -691,13 +747,20 @@ async def batch_analyze(
                 successful_docs = []
                 for doc_result in documents_results:
                     if doc_result.status == "success" and doc_result.analysis:
+                        llm_analysis = doc_result.analysis.get("llm_analysis", {})
+                        resume_json = doc_result.analysis.get("resume_json", {})
+                        
                         candidate_data = {
                             "document_id": doc_result.document_id,
                             "filename": doc_result.filename,
-                            "name": doc_result.analysis.get("llm_analysis", {}).get("candidate_name", "Unknown"),
-                            "experience_summary": doc_result.analysis.get("llm_analysis", {}).get("experience_summary", ""),
-                            "skills": doc_result.analysis.get("llm_analysis", {}).get("skills", {}),
-                            "preliminary_fit_score": doc_result.analysis.get("llm_analysis", {}).get("overall_score", 0)
+                            "name": llm_analysis.get("candidate_name", "Unknown"),
+                            "experience_summary": llm_analysis.get("experience_summary", ""),
+                            "skills": llm_analysis.get("skills", {}),
+                            "certifications": llm_analysis.get("certifications", []),
+                            "preliminary_fit_score": llm_analysis.get("overall_score", 0),
+                            "seniority_level": llm_analysis.get("seniority_level", "mid"),
+                            "years_experience": llm_analysis.get("key_metrics", {}).get("years_experience", 0),
+                            "resume_json": resume_json
                         }
                         successful_docs.append(candidate_data)
                 
@@ -718,13 +781,14 @@ async def batch_analyze(
                 logger.error(traceback.format_exc())
                 # Continue without comparative analysis - not critical
         
-        elif success_count == 1:
-            logger.info("ℹ Only 1 candidate - skipping PASS 2 comparative analysis")
+        elif not is_single_mode and success_count == 1:
+            logger.info("ℹ Only 1 successful candidate from batch - skipping PASS 2 comparative analysis")
         
         processing_time_total = (datetime.now() - start_time).total_seconds()
         
-        # Create batch response with both PASS 1 and PASS 2 results
+        # Create batch response with both PASS 1 and optional PASS 2 results
         batch_response = BatchAnalyzeResponse(
+            mode="batch",
             batch_id=batch_id,
             job_requirements=job_requirements,
             documents=documents_results,
@@ -738,12 +802,13 @@ async def batch_analyze(
             success=success_count > 0
         )
         
-        logger.info(f"=" * 70)
+        logger.info(f"{'='*70}")
         logger.info(f"✅ BATCH ANALYSIS COMPLETE (PASS 1 + PASS 2)")
+        logger.info(f"   Mode: batch (comparative analysis {'enabled' if comparative_analysis else 'not available'})")
         logger.info(f"   Documents: {success_count} succeeded, {failed_count} failed")
         logger.info(f"   Comparative analysis: {'Yes' if comparative_analysis else 'No'}")
         logger.info(f"   Total time: {processing_time_total:.2f}s")
-        logger.info(f"=" * 70)
+        logger.info(f"{'='*70}")
         
         return batch_response
     

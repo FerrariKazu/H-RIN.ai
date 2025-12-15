@@ -68,21 +68,24 @@ class LLMAnalyzer:
                resume_json: Dict,
                resume_markdown: str,
                raw_text: str = "",
-               job_requirements: str = None) -> Dict[str, Any]:
+               job_requirements: str = None,
+               is_single_mode: bool = False) -> Dict[str, Any]:
         """
-        Perform comprehensive LLM analysis
+        Perform comprehensive LLM analysis - PASS 1
         
         Args:
             resume_json: Structured resume data
             resume_markdown: Markdown version of resume
             raw_text: Original raw text
             job_requirements: Optional job description to assess fit
+            is_single_mode: True if single-CV mode, False if batch mode
         
         Returns:
             Analysis results with scoring and recommendations
         """
         self.logs = []
         self.job_requirements = job_requirements
+        self.is_single_mode = is_single_mode  # Store for prompt building
         
         # If no LLM available, provide heuristic analysis
         if not self.client:
@@ -90,8 +93,8 @@ class LLMAnalyzer:
             return self._heuristic_analysis(resume_json, job_requirements)
         
         try:
-            # Prepare prompt
-            prompt = self._build_analysis_prompt(resume_markdown, job_requirements)
+            # Prepare prompt with mode awareness
+            prompt = self._build_analysis_prompt(resume_markdown, job_requirements, is_single_mode)
             
             # Get analysis from LLM
             analysis_text = self._call_llm(prompt)
@@ -187,15 +190,40 @@ class LLMAnalyzer:
             self._log(f"Ollama call failed: {e}", "ERROR")
             raise
     
-    def _build_analysis_prompt(self, resume_markdown: str, job_requirements: str = None) -> str:
+    def _build_analysis_prompt(self, resume_markdown: str, job_requirements: str = None, is_single_mode: bool = False) -> str:
         """
         Build analysis prompt for LLM with MANDATORY job requirements enforcement
+        
+        CRITICAL: Mode-specific prompt guardrails:
+        - Single-CV mode: "This is a single candidate. Do not compare against others."
+        - Batch mode: "You are evaluating candidates independently in PASS 1."
         
         This prompt MUST be used with:
         - Structured JSON output (format=json in Ollama)
         - Low temperature (≤ 0.3) for consistency
         - All sections must reference job alignment
         """
+        
+        # ==== MODE-SPECIFIC GUARDRAIL ====
+        mode_instruction = ""
+        if is_single_mode:
+            mode_instruction = """
+CRITICAL CONSTRAINT - SINGLE CANDIDATE MODE:
+This is a SINGLE candidate being analyzed in isolation.
+Do NOT compare against other candidates.
+Do NOT reference "other candidates" or "compared to".
+Do NOT mention comparative rankings or relative positions.
+Provide ONLY standalone analysis for this one person.
+"""
+        else:
+            mode_instruction = """
+PASS 1 CONSTRAINT - BATCH MODE:
+You are evaluating this candidate independently in PASS 1.
+Do NOT perform comparative analysis yet.
+Do NOT compare against other candidates.
+Comparative analysis will happen in PASS 2 with all candidates together.
+Focus on ONLY this candidate's individual profile.
+"""
         
         # ==== MANDATORY JOB REQUIREMENTS SECTION ====
         job_requirements_section = ""
@@ -230,6 +258,8 @@ This is a GENERIC resume analysis without job-specific fit assessment.
         # ==== STRUCTURED OUTPUT REQUIREMENTS ====
         prompt = f"""RESUME ANALYSIS - STRUCTURED OUTPUT (JSON ONLY)
 
+{mode_instruction}
+
 {job_requirements_section}
 
 CANDIDATE RESUME:
@@ -247,8 +277,10 @@ INSTRUCTIONS:
 
 OUTPUT MUST BE VALID JSON IN THIS EXACT STRUCTURE:
 {{
+    "candidate_name": "Extract candidate's full name from resume",
     "job_requirements_analyzed": {"true" if job_requirements and job_requirements.strip() else "false"},
     "executive_summary": "2-3 sentence assessment of overall fit relative to job (or generic if no job provided)",
+    "experience_summary": "Brief summary of candidate's work experience, years, and key roles",
     "job_alignment_summary": "Paragraph explaining how resume aligns or misaligns with job requirements",
     "matched_requirements": [
         {{"requirement": "Required Skill", "evidence": "How/where it appears in resume", "strength": "brief assessment"}}
@@ -263,11 +295,13 @@ OUTPUT MUST BE VALID JSON IN THIS EXACT STRUCTURE:
     "cultural_fit": {{"score": 0-100, "explanation": "Cultural/experience alignment to job"}},
     "seniority_level": "junior|mid|senior|lead|executive",
     "role_fit_verdict": {{"recommendation": "YES|MAYBE|NO", "confidence": 0-100, "rationale": "Why this recommendation"}},
-    "recommended_roles": ["role 1", "role 2"],
+    "recommended_roles": ["role 1", "role 2", "role 3", "role 4", "role 5"],
     "critical_gaps": ["gap 1", "gap 2"],
     "key_achievements": ["achievement 1", "achievement 2"],
     "overall_score": 0-100,
-    "key_metrics": {{"years_experience": 0, "skills_count": 0, "education_count": 0}}
+    "key_metrics": {{"years_experience": 0, "skills_count": 0, "education_count": 0}},
+    "skills": {{"technical": ["skill1", "skill2", ...], "soft": ["skill1", "skill2", ...]}},
+    "certifications": ["certification 1", "certification 2", ...]
 }}
 
 VALIDATION RULES:
@@ -277,6 +311,10 @@ VALIDATION RULES:
 - All strings must be under 500 characters
 - No nested objects beyond what's shown
 - Matched/missing requirements arrays CAN be empty if not applicable
+- recommended_roles MUST have at least 5 roles
+- Extract candidate_name from the resume text
+- experience_summary should briefly describe work history
+- skills and certifications must be extracted from resume
 """
         return prompt
     
@@ -719,24 +757,28 @@ Return ONLY the JSON array, no additional text."""
         """
         Build prompt for PASS 2 comparative analysis
         
-        CRITICAL: This prompt must force Qwen2.5 to compare candidates
-        against each other, not evaluate them independently.
+        CRITICAL: This prompt must force Qwen2.5 to:
+        1. Compare candidates against each other comprehensively
+        2. Generate detailed profiles, experience summaries, skills, certificates for EACH candidate
+        3. Provide AI fit scores and evaluation factors comparing all candidates
+        4. Recommend at least 5 roles PER candidate based on comparative analysis
         """
         
-        # Build candidate profiles string
+        # Build candidate profiles string with FULL details
         candidate_profiles = ""
         for idx, cand in enumerate(candidates, 1):
             doc_id = cand.get("document_id", f"DOC_{idx}")
             name = cand.get("name", "Unknown")
+            filename = cand.get("filename", "resume.pdf")
             experience = cand.get("experience_summary", "Not specified")
             skills = cand.get("skills", {})
             
-            tech_skills = skills.get("technical", [])[:5]
-            soft_skills = skills.get("soft", [])[:3]
+            tech_skills = skills.get("technical", [])[:10]
+            soft_skills = skills.get("soft", [])[:5]
             preliminary_score = cand.get("preliminary_fit_score", 0)
             
             candidate_profiles += f"""
-CANDIDATE {idx} (ID: {doc_id})
+CANDIDATE {idx} (ID: {doc_id}, File: {filename})
 - Name: {name}
 - Experience: {experience}
 - Technical Skills: {', '.join(tech_skills) if tech_skills else 'N/A'}
@@ -744,9 +786,10 @@ CANDIDATE {idx} (ID: {doc_id})
 - Preliminary Score: {preliminary_score}/100
 """
         
-        prompt = f"""YOU ARE A COMPARATIVE RECRUITMENT ANALYST
+        prompt = f"""YOU ARE A COMPARATIVE RECRUITMENT ANALYST using qwen2.5:7b-instruct-q4_K_M
 
-DO NOT evaluate candidates independently. You must compare them AGAINST EACH OTHER.
+CRITICAL MISSION: Perform COMPREHENSIVE COMPARATIVE ANALYSIS of ALL candidates.
+Do NOT evaluate candidates independently. You MUST compare them AGAINST EACH OTHER on every dimension.
 
 JOB REQUIREMENTS:
 {job_requirements if job_requirements else "Generic evaluation - no specific requirements"}
@@ -754,35 +797,139 @@ JOB REQUIREMENTS:
 CANDIDATES TO COMPARE:
 {candidate_profiles}
 
-CRITICAL INSTRUCTIONS:
-1. Compare candidates RELATIVE to each other, not in absolute terms
-2. Reference candidates by their document ID (DOC_X) throughout
-3. Explain why Candidate A outranks Candidate B with specific details
-4. Identify which candidate is strongest, which is weakest
-5. Explain specific skill gaps for EACH candidate
-6. Normalize scores so they reflect relative fit within this group
-7. Provide different hiring recommendations for different candidates
+MANDATORY OUTPUT STRUCTURE (JSON):
+You MUST generate ALL of the following fields with COMPLETE data for EVERY candidate:
 
-OUTPUT FORMAT (JSON):
 {{
     "comparative_ranking": [
-        {{"document_id": "DOC_X", "rank": 1, "normalized_fit_score": XX, "rationale": "Why this candidate ranks first"}},
-        ...
+        {{
+            "document_id": "DOC_X",
+            "rank": 1,
+            "normalized_fit_score": 0-100,
+            "rationale": "Detailed explanation comparing to other candidates"
+        }}
     ],
-    "strengths_comparison": "Compare strengths across candidates. Which candidate excels where? Reference by DOC_ID.",
-    "weaknesses_comparison": "Identify gaps. Which candidate lacks what? Why is DOC_X weak in Y?",
-    "skill_coverage_matrix": {{"DOC_1": {{"covered": [...], "missing": [...]}}, ...}},
-    "strongest_candidate": {{"document_id": "DOC_X", "reason": "Why this candidate is best"}},
-    "best_skill_coverage": {{"document_id": "DOC_X", "skills": [...], "reason": "..."}},
-    "hiring_recommendations": {{
-        "DOC_1": "Specific recommendation for this candidate",
-        "DOC_2": "Different recommendation for this candidate",
+    
+    "candidate_profiles": [
+        {{
+            "document_id": "DOC_X",
+            "name": "Candidate Name",
+            "summary": "2-3 sentence profile comparing strengths/weaknesses to other candidates",
+            "seniority_level": "junior|mid|senior|lead|executive",
+            "years_experience": X,
+            "compared_to_others": "How this candidate compares to the group"
+        }}
+    ],
+    
+    "experience_summaries": [
+        {{
+            "document_id": "DOC_X",
+            "experience_quality": "Assessment of experience depth compared to others",
+            "key_positions": ["Role 1", "Role 2"],
+            "comparative_strength": "Is this candidate more/less experienced than others? By how much?"
+        }}
+    ],
+    
+    "skills_and_entities": [
+        {{
+            "document_id": "DOC_X",
+            "technical_skills": ["skill1", "skill2", "skill3", ...],
+            "soft_skills": ["skill1", "skill2", ...],
+            "certifications": ["cert1", "cert2", ...],
+            "unique_skills": ["Skills only this candidate has"],
+            "common_skills": ["Skills shared with other candidates"],
+            "skill_gaps": ["Skills others have but this candidate lacks"]
+        }}
+    ],
+    
+    "ai_fit_scores": [
+        {{
+            "document_id": "DOC_X",
+            "overall_fit_score": 0-100,
+            "compared_to_group": "above average|average|below average",
+            "score_breakdown": {{
+                "technical_fit": 0-100,
+                "experience_fit": 0-100,
+                "cultural_fit": 0-100,
+                "skill_coverage": 0-100
+            }},
+            "why_this_score": "Explanation comparing to other candidates"
+        }}
+    ],
+    
+    "evaluation_factors": [
+        {{
+            "document_id": "DOC_X",
+            "strengths": ["strength1 (compared to others)", "strength2", ...],
+            "weaknesses": ["weakness1 (relative to group)", "weakness2", ...],
+            "opportunities": ["opportunity1", "opportunity2"],
+            "threats": ["threat1", "threat2"],
+            "comparative_advantages": ["What makes this candidate stand out"],
+            "comparative_disadvantages": ["Where this candidate falls short"]
+        }}
+    ],
+    
+    "recommended_roles": [
+        {{
+            "document_id": "DOC_X",
+            "roles": [
+                {{
+                    "title": "Role Title",
+                    "fit_score": 0-100,
+                    "why_good_fit": "Explanation",
+                    "compared_to_others": "Would other candidates fit this role better/worse?"
+                }},
+                ... (MINIMUM 5 roles per candidate)
+            ]
+        }}
+    ],
+    
+    "strengths_comparison": "Detailed comparison of strengths across ALL candidates. Who is strongest where? Use document IDs.",
+    
+    "weaknesses_comparison": "Detailed comparison of weaknesses. Who struggles with what? Which candidate has the most critical gaps? Use document IDs.",
+    
+    "skill_coverage_matrix": {{
+        "DOC_1": {{"covered": ["skill1", "skill2"], "missing": ["skill3"]}},
+        "DOC_2": {{"covered": [...], "missing": [...]}},
         ...
     }},
-    "executive_summary": "2-3 sentence summary comparing all candidates"
+    
+    "strongest_candidate": {{
+        "document_id": "DOC_X",
+        "reason": "Why this candidate outperforms all others"
+    }},
+    
+    "best_skill_coverage": {{
+        "document_id": "DOC_X",
+        "skills": ["comprehensive list"],
+        "reason": "Why this candidate has best skill coverage compared to others"
+    }},
+    
+    "hiring_recommendations": {{
+        "DOC_1": "Hire/Don't Hire with detailed reasoning comparing to other candidates",
+        "DOC_2": "Different recommendation based on comparative analysis",
+        ...
+    }},
+    
+    "executive_summary": "2-3 paragraph comprehensive summary comparing ALL candidates, highlighting who excels where, final rankings, and hiring recommendations"
 }}
 
-Remember: COMPARE not ISOLATE. Reference specific document IDs. Explain rankings with details."""
+CRITICAL REQUIREMENTS:
+1. EVERY array must have entries for ALL {len(candidates)} candidates
+2. Reference candidates by document_id throughout (DOC_1, DOC_2, etc.)
+3. Use COMPARATIVE language: "stronger than", "better than", "lacks compared to", "outperforms"
+4. Explain WHY candidate A ranks above/below candidate B
+5. Recommended roles MUST have at least 5 roles per candidate with comparative analysis
+6. Scores must be normalized across the group (not all 80+)
+7. Identify unique strengths AND weaknesses for each candidate relative to others
+8. Skills and certifications must be extracted and compared across all candidates
+9. candidate_profiles MUST include name, summary, seniority, years_experience for ALL candidates
+10. experience_summaries MUST detail work history and compare experience depth between candidates
+11. skills_and_entities MUST list technical_skills, soft_skills, certifications, unique_skills, and gaps
+12. ai_fit_scores MUST include overall_fit_score and score_breakdown for ALL candidates
+13. evaluation_factors MUST include strengths, weaknesses, opportunities, threats, and comparative advantages/disadvantages
+
+OUTPUT ONLY VALID JSON. No markdown, no explanations outside JSON."""
         
         return prompt
     
