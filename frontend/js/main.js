@@ -167,19 +167,61 @@ document.addEventListener('DOMContentLoaded', function() {
         const experience = resume.experience || [];
         const skills = resume.skills || [];
         
+        // Calculate total experience in years and months
+        let totalMonths = 0;
+        const today = new Date('2025-12-15');
+        
+        experience.forEach(exp => {
+            if (exp.start_date && exp.end_date) {
+                const start = new Date(exp.start_date);
+                const end = exp.end_date.toLowerCase() === 'present' ? today : new Date(exp.end_date);
+                const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+                totalMonths += Math.max(0, months);
+            }
+        });
+        
+        const years = Math.floor(totalMonths / 12);
+        const months = totalMonths % 12;
+        const experienceText = years > 0 || months > 0 
+            ? `${years} year${years !== 1 ? 's' : ''} ${months} month${months !== 1 ? 's' : ''}`
+            : '0 years';
+        
+        // Determine latest role
+        let latestRole = 'Beginner';
+        if (experience.length > 0 && experience[0]?.role) {
+            latestRole = experience[0].role;
+        } else if (experience.length === 0) {
+            latestRole = 'None';
+        }
+        
+        // Extract extra links (github, etc)
+        const extraLinks = [];
+        if (contact.linkedin) {
+            extraLinks.push(`<a href="${contact.linkedin}" target="_blank" style="color:var(--accent);margin-right:1rem">LinkedIn</a>`);
+        }
+        if (contact.github) {
+            extraLinks.push(`<a href="${contact.github}" target="_blank" style="color:var(--accent);margin-right:1rem">GitHub</a>`);
+        }
+        if (contact.website) {
+            extraLinks.push(`<a href="${contact.website}" target="_blank" style="color:var(--accent);margin-right:1rem">Website</a>`);
+        }
+        if (contact.portfolio) {
+            extraLinks.push(`<a href="${contact.portfolio}" target="_blank" style="color:var(--accent);margin-right:1rem">Portfolio</a>`);
+        }
+        
         // 1. Summary Section
         document.getElementById('profile-content').innerHTML = `
-            <p><strong>Name:</strong> ${resume.name || "Unknown"}</p>
+            <p><strong>Name:</strong> ${resume.name || contact.name || "Unknown"}</p>
             <p><strong>Email:</strong> ${contact.email || "N/A"}</p>
             <p><strong>Phone:</strong> ${contact.phone || "N/A"}</p>
             <div style="margin-top:0.5rem">
-                ${contact.linkedin ? `<a href="${contact.linkedin}" target="_blank" style="color:var(--accent)">LinkedIn</a>` : ''}
+                ${extraLinks.join('')}
             </div>
         `;
         
         document.getElementById('experience-summary').innerHTML = `
-            <p><strong>Years Exp:</strong> ${resume.total_years_experience || 0}</p>
-            <p><strong>Latest Role:</strong> ${experience[0]?.role || "N/A"}</p>
+            <p><strong>Years Exp:</strong> ${experienceText}</p>
+            <p><strong>Latest Role:</strong> ${latestRole}</p>
             <p><strong>Latest Company:</strong> ${experience[0]?.company || "N/A"}</p>
         `;
         
@@ -196,31 +238,48 @@ document.addEventListener('DOMContentLoaded', function() {
             aiSummaryEl.innerHTML = "<p>No summary available</p>";
         }
 
-        // 2. Skills
+        // 2. Skills - handle both string array and object array
         const skillsContainer = document.getElementById('skills-cloud');
         skillsContainer.innerHTML = '';
-        const uniqueSkills = [...new Set(skills)];
+        
+        // Extract skill names from objects or use strings directly
+        const skillNames = skills.map(skill => {
+            if (typeof skill === 'string') return skill;
+            if (typeof skill === 'object' && skill !== null) {
+                return skill.name || skill.skill || skill.text || JSON.stringify(skill);
+            }
+            return String(skill);
+        });
+        
+        const uniqueSkills = [...new Set(skillNames)];
         if (uniqueSkills.length > 0) {
-            uniqueSkills.forEach(skill => {
+            uniqueSkills.forEach(skillName => {
                 const span = document.createElement('span');
                 span.className = 'skill-tag';
-                span.textContent = skill;
+                span.textContent = skillName;
                 skillsContainer.appendChild(span);
             });
         } else {
             skillsContainer.innerHTML = '<p>No skills detected</p>';
         }
         
-        // NER Table
+        // NER Table - handle certifications
         const tbody = document.querySelector('#entities-table tbody');
         if (tbody) {
             tbody.innerHTML = '';
-            // Safely iterate if certifications exist
             const certs = resume.certifications || [];
             if (certs.length > 0) {
                 certs.forEach(cert => {
-                    const name = typeof cert === 'string' ? cert : cert.name || cert;
-                    addRow(tbody, name, "CERT", "High");
+                    // Handle both string and object formats
+                    let certName = '';
+                    if (typeof cert === 'string') {
+                        certName = cert;
+                    } else if (typeof cert === 'object' && cert !== null) {
+                        certName = cert.name || cert.certification || cert.title || JSON.stringify(cert);
+                    } else {
+                        certName = String(cert);
+                    }
+                    addRow(tbody, certName, "CERT", "High");
                 });
             } else {
                 const row = tbody.insertRow();
