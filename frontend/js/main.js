@@ -210,9 +210,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Safely access nested properties
         const resume = data.struct || {};
-        const contact = resume.contact_info || {};
+        const contact = resume.contact || {};
         const experience = resume.experience || [];
         const skills = resume.skills || [];
+        const entities = data.nlp?.entities || {};
+        
+        // Extract name from persons entities if not in resume
+        let candidateName = resume.name || contact.name || "Unknown";
+        if (candidateName === "Unknown" && entities.persons && entities.persons.length > 0) {
+            candidateName = entities.persons[0];
+        }
         
         // Calculate total experience in years and months
         let totalMonths = 0;
@@ -258,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 1. Summary Section
         document.getElementById('profile-content').innerHTML = `
-            <p><strong>Name:</strong> ${resume.name || contact.name || "Unknown"}</p>
+            <p><strong>Name:</strong> ${candidateName}</p>
             <p><strong>Email:</strong> ${contact.email || "N/A"}</p>
             <p><strong>Phone:</strong> ${contact.phone || "N/A"}</p>
             <div style="margin-top:0.5rem">
