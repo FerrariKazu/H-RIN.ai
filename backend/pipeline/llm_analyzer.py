@@ -671,3 +671,188 @@ Return ONLY the JSON array, no additional text."""
             logger.error(message)
         else:
             logger.info(message)
+    
+    def analyze_comparative(self, 
+                           candidates: List[Dict],
+                           job_requirements: str = "") -> Dict[str, Any]:
+        """
+        PASS 2: Comparative analysis across all candidates
+        
+        Receives all candidates with their PASS 1 results and performs
+        cross-candidate comparison using a single LLM call.
+        
+        Args:
+            candidates: List of candidate dicts with document_id, name, skills, etc.
+            job_requirements: Job requirements for context
+            
+        Returns:
+            Dict with comparative_analysis results
+        """
+        self._log("Starting PASS 2: Comparative cross-candidate analysis")
+        self._log(f"Analyzing {len(candidates)} candidates comparatively")
+        
+        try:
+            # Build comprehensive prompt with ALL candidates
+            prompt = self._build_comparative_prompt(candidates, job_requirements)
+            
+            # Call LLM with ALL candidates in single request
+            self._log("Calling LLM for comparative evaluation...")
+            response = self._call_llm(prompt)
+            
+            # Parse comparative response
+            comparative_result = self._parse_comparative_response(response, candidates)
+            comparative_result["logs"] = self.logs
+            
+            self._log("✓ Comparative analysis complete")
+            return comparative_result
+            
+        except Exception as e:
+            error_msg = f"Comparative analysis failed: {str(e)}"
+            self._log(error_msg, "ERROR")
+            return {
+                "error": error_msg,
+                "logs": self.logs,
+                "comparative_analysis": None
+            }
+    
+    def _build_comparative_prompt(self, candidates: List[Dict], job_requirements: str) -> str:
+        """
+        Build prompt for PASS 2 comparative analysis
+        
+        CRITICAL: This prompt must force Qwen2.5 to compare candidates
+        against each other, not evaluate them independently.
+        """
+        
+        # Build candidate profiles string
+        candidate_profiles = ""
+        for idx, cand in enumerate(candidates, 1):
+            doc_id = cand.get("document_id", f"DOC_{idx}")
+            name = cand.get("name", "Unknown")
+            experience = cand.get("experience_summary", "Not specified")
+            skills = cand.get("skills", {})
+            
+            tech_skills = skills.get("technical", [])[:5]
+            soft_skills = skills.get("soft", [])[:3]
+            preliminary_score = cand.get("preliminary_fit_score", 0)
+            
+            candidate_profiles += f"""
+CANDIDATE {idx} (ID: {doc_id})
+- Name: {name}
+- Experience: {experience}
+- Technical Skills: {', '.join(tech_skills) if tech_skills else 'N/A'}
+- Soft Skills: {', '.join(soft_skills) if soft_skills else 'N/A'}
+- Preliminary Score: {preliminary_score}/100
+"""
+        
+        prompt = f"""YOU ARE A COMPARATIVE RECRUITMENT ANALYST
+
+DO NOT evaluate candidates independently. You must compare them AGAINST EACH OTHER.
+
+JOB REQUIREMENTS:
+{job_requirements if job_requirements else "Generic evaluation - no specific requirements"}
+
+CANDIDATES TO COMPARE:
+{candidate_profiles}
+
+CRITICAL INSTRUCTIONS:
+1. Compare candidates RELATIVE to each other, not in absolute terms
+2. Reference candidates by their document ID (DOC_X) throughout
+3. Explain why Candidate A outranks Candidate B with specific details
+4. Identify which candidate is strongest, which is weakest
+5. Explain specific skill gaps for EACH candidate
+6. Normalize scores so they reflect relative fit within this group
+7. Provide different hiring recommendations for different candidates
+
+OUTPUT FORMAT (JSON):
+{{
+    "comparative_ranking": [
+        {{"document_id": "DOC_X", "rank": 1, "normalized_fit_score": XX, "rationale": "Why this candidate ranks first"}},
+        ...
+    ],
+    "strengths_comparison": "Compare strengths across candidates. Which candidate excels where? Reference by DOC_ID.",
+    "weaknesses_comparison": "Identify gaps. Which candidate lacks what? Why is DOC_X weak in Y?",
+    "skill_coverage_matrix": {{"DOC_1": {{"covered": [...], "missing": [...]}}, ...}},
+    "strongest_candidate": {{"document_id": "DOC_X", "reason": "Why this candidate is best"}},
+    "best_skill_coverage": {{"document_id": "DOC_X", "skills": [...], "reason": "..."}},
+    "hiring_recommendations": {{
+        "DOC_1": "Specific recommendation for this candidate",
+        "DOC_2": "Different recommendation for this candidate",
+        ...
+    }},
+    "executive_summary": "2-3 sentence summary comparing all candidates"
+}}
+
+Remember: COMPARE not ISOLATE. Reference specific document IDs. Explain rankings with details."""
+        
+        return prompt
+    
+    def _parse_comparative_response(self, response: str, candidates: List[Dict]) -> Dict:
+        """Parse comparative LLM response into structured format"""
+        
+        try:
+            # Extract JSON from response
+            json_str = response
+            if "```json" in response:
+                json_str = response.split("```json")[1].split("```")[0]
+            elif "```" in response:
+                json_str = response.split("```")[1].split("```")[0]
+            
+            comparative_data = json.loads(json_str)
+            self._log("✓ Comparative response parsed successfully")
+            
+            # Verify it's truly comparative (not just repeated single evaluations)
+            self._verify_comparative_quality(comparative_data, candidates)
+            
+            return {
+                "comparative_analysis": comparative_data,
+                "success": True
+            }
+            
+        except json.JSONDecodeError as e:
+            self._log(f"Failed to parse comparative JSON: {str(e)}", "ERROR")
+            # Fall back to text response
+            return {
+                "comparative_analysis": {
+                    "raw_response": response,
+                    "parse_error": str(e)
+                },
+                "success": False
+            }
+    
+    def _verify_comparative_quality(self, comparative_data: Dict, candidates: List[Dict]):
+        """
+        Verify the comparative analysis is truly comparative and not just
+        repeated single-candidate evaluations (FAILURE CRITERIA CHECK)
+        """
+        
+        try:
+            # Check 1: Ranking should be different (not all same score)
+            ranking = comparative_data.get("comparative_ranking", [])
+            if ranking:
+                scores = [r.get("normalized_fit_score", 0) for r in ranking]
+                if len(set(scores)) == 1:
+                    self._log("⚠ WARNING: All candidates have identical scores - may not be truly comparative", "ERROR")
+                else:
+                    self._log(f"✓ Scores vary across candidates: {scores}")
+            
+            # Check 2: Rankings reference different candidates
+            ranking_ids = [r.get("document_id") for r in ranking]
+            if len(ranking_ids) != len(set(ranking_ids)):
+                self._log("⚠ WARNING: Duplicate document IDs in ranking", "ERROR")
+            
+            # Check 3: Summaries mention comparisons (not isolation)
+            strengths = comparative_data.get("strengths_comparison", "")
+            weaknesses = comparative_data.get("weaknesses_comparison", "")
+            executive = comparative_data.get("executive_summary", "")
+            
+            comparison_keywords = ["compared", "stronger", "weaker", "better", "worse", "outranks", "vs", "both"]
+            found_comparison = any(keyword in (strengths + weaknesses + executive).lower() 
+                                 for keyword in comparison_keywords)
+            
+            if found_comparison:
+                self._log("✓ Comparative language detected in analysis")
+            else:
+                self._log("⚠ WARNING: Limited comparative language detected", "ERROR")
+            
+        except Exception as e:
+            self._log(f"Quality check warning: {str(e)}", "ERROR")

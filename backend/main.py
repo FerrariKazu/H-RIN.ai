@@ -176,6 +176,40 @@ class AnalyzeResponse(BaseModel):
     processing_logs: List[str]
     success: bool
 
+class DocumentResult(BaseModel):
+    """Result for a single document in batch processing (PASS 1)"""
+    document_id: str
+    filename: str
+    status: str  # 'success' or 'failed'
+    extraction: Optional[Dict] = None
+    analysis: Optional[Dict] = None
+    error: Optional[str] = None
+
+class ComparativeAnalysisResult(BaseModel):
+    """PASS 2: Comparative analysis across all candidates"""
+    comparative_ranking: List[Dict] = []
+    strengths_comparison: str = ""
+    weaknesses_comparison: str = ""
+    skill_coverage_matrix: Dict = {}
+    strongest_candidate: Dict = {}
+    best_skill_coverage: Dict = {}
+    hiring_recommendations: Dict = {}
+    executive_summary: str = ""
+
+class BatchAnalyzeResponse(BaseModel):
+    """Batch analysis response model with PASS 1 + PASS 2"""
+    batch_id: str
+    job_requirements: str
+    documents: List[DocumentResult]
+    comparative_analysis: Optional[ComparativeAnalysisResult] = None
+    job_requirements_used: bool
+    job_requirements_provided: bool
+    documents_count: int
+    success_count: int
+    failed_count: int
+    processing_time: float
+    success: bool
+
 # =====================================================
 # HELPER FUNCTIONS
 # =====================================================
@@ -499,6 +533,238 @@ async def process_complete(file: UploadFile = File(...), enable_llm_analysis: bo
             except:
                 pass
 
+@app.post("/batch-analyze")
+async def batch_analyze(
+    files: List[UploadFile] = File(...),
+    job_requirements: str = "",
+    batch_id: str = ""
+):
+    """
+    Batch analyze multiple PDF resumes
+    
+    - Accepts up to 5 PDF files
+    - Processes each independently through full pipeline
+    - Applies same job requirements to all documents
+    - Returns results for each document
+    """
+    check_components_ready()
+    
+    start_time = datetime.now()
+    temp_files = []
+    documents_results = []
+    
+    try:
+        # Validate file count
+        if not files or len(files) == 0:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        if len(files) > 5:
+            raise HTTPException(status_code=400, detail="Maximum 5 files allowed per batch")
+        
+        # Validate all are PDFs
+        for file in files:
+            if not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File '{file.filename}' is not a PDF. Only PDF files are accepted."
+                )
+        
+        logger.info(f"🚀 Starting batch analysis: {len(files)} files, batch_id={batch_id}")
+        logger.info(f"Job requirements provided: {len(job_requirements.split()) if job_requirements.strip() else 0} words")
+        
+        # Process each file independently
+        for idx, file in enumerate(files, 1):
+            document_id = f"doc_{batch_id}_{idx}_{datetime.now().timestamp()}"
+            logger.info(f"Processing document {idx}/{len(files)}: {file.filename} (ID: {document_id})")
+            
+            temp_path = None
+            try:
+                # Step 1: Save temporary file
+                temp_path = f"temp_{datetime.now().timestamp()}_{file.filename}"
+                with open(temp_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                temp_files.append(temp_path)
+                
+                logger.info(f"  [{idx}] Saved to temp: {temp_path}")
+                
+                # Step 2: PDF Extraction
+                logger.info(f"  [{idx}] Extracting PDF text...")
+                extraction_result = pdf_processor.process(temp_path)
+                raw_text = extraction_result.raw_text
+                
+                if not raw_text or len(raw_text.strip()) < 50:
+                    raise ValueError("Extracted text too short or empty")
+                
+                logger.info(f"  [{idx}] Extracted {len(raw_text)} characters")
+                
+                # Step 3: NLP Analysis
+                logger.info(f"  [{idx}] Running NLP analysis...")
+                nlp_result = nlp_engine.extract(raw_text)
+                
+                # Step 4: Resume Reconstruction
+                logger.info(f"  [{idx}] Reconstructing resume...")
+                reconstruction_result = resume_reconstructor.reconstruct(
+                    raw_text=raw_text,
+                    nlp_data=nlp_result,
+                    sections=nlp_result.get("sections", {})
+                )
+                
+                resume_markdown = reconstruction_result.get("markdown", "")
+                resume_json = reconstruction_result.get("json", {})
+                
+                # Step 5: LLM Analysis with job requirements
+                logger.info(f"  [{idx}] Running LLM analysis with job requirements...")
+                llm_analysis = llm_analyzer.analyze(
+                    resume_json=resume_json,
+                    resume_markdown=resume_markdown,
+                    raw_text=raw_text,
+                    job_requirements=job_requirements
+                )
+                
+                logger.info(f"  [{idx}] Analysis complete - Score: {llm_analysis.get('llm_analysis', {}).get('overall_score', 'N/A')}")
+                
+                # Build document result
+                doc_result = DocumentResult(
+                    document_id=document_id,
+                    filename=file.filename,
+                    status="success",
+                    extraction={
+                        "raw_text_preview": raw_text[:300] + "..." if len(raw_text) > 300 else raw_text,
+                        "char_count": len(raw_text),
+                        "confidence": extraction_result.confidence,
+                        "document_type": "Scanned" if extraction_result.needs_ocr else "Digital"
+                    },
+                    analysis={
+                        "resume_json": resume_json,
+                        "resume_markdown": resume_markdown,
+                        "llm_analysis": llm_analysis
+                    }
+                )
+                
+                documents_results.append(doc_result)
+                logger.info(f"✓ Document {idx} completed successfully")
+                
+            except Exception as e:
+                error_msg = f"Document processing failed: {str(e)}"
+                logger.error(f"✗ Document {idx} failed: {error_msg}")
+                logger.error(traceback.format_exc())
+                
+                # Record failure
+                doc_result = DocumentResult(
+                    document_id=document_id,
+                    filename=file.filename,
+                    status="failed",
+                    error=error_msg
+                )
+                
+                documents_results.append(doc_result)
+            
+            finally:
+                # Cleanup this file's temp
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+        
+        processing_time_pass1 = (datetime.now() - start_time).total_seconds()
+        
+        # Count results
+        success_count = sum(1 for d in documents_results if d.status == "success")
+        failed_count = len(documents_results) - success_count
+        
+        logger.info(f"=" * 70)
+        logger.info(f"✅ PASS 1 COMPLETE: {success_count} succeeded, {failed_count} failed")
+        logger.info(f"   Time: {processing_time_pass1:.2f}s")
+        logger.info(f"=" * 70)
+        
+        # PASS 2: Comparative Analysis (only if we have successful documents)
+        comparative_analysis = None
+        if success_count > 1:  # Only comparative if 2+ successful candidates
+            logger.info("=" * 70)
+            logger.info("🚀 STARTING PASS 2: CROSS-CANDIDATE COMPARATIVE ANALYSIS")
+            logger.info(f"   Comparing {success_count} candidates...")
+            logger.info("=" * 70)
+            
+            try:
+                # Extract successful candidates for comparison
+                successful_docs = []
+                for doc_result in documents_results:
+                    if doc_result.status == "success" and doc_result.analysis:
+                        candidate_data = {
+                            "document_id": doc_result.document_id,
+                            "filename": doc_result.filename,
+                            "name": doc_result.analysis.get("llm_analysis", {}).get("candidate_name", "Unknown"),
+                            "experience_summary": doc_result.analysis.get("llm_analysis", {}).get("experience_summary", ""),
+                            "skills": doc_result.analysis.get("llm_analysis", {}).get("skills", {}),
+                            "preliminary_fit_score": doc_result.analysis.get("llm_analysis", {}).get("overall_score", 0)
+                        }
+                        successful_docs.append(candidate_data)
+                
+                # Call LLM for comparative analysis (single call with ALL candidates)
+                comparative_result = llm_analyzer.analyze_comparative(
+                    candidates=successful_docs,
+                    job_requirements=job_requirements
+                )
+                
+                if comparative_result and "comparative_analysis" in comparative_result:
+                    comparative_analysis = comparative_result["comparative_analysis"]
+                    logger.info("✓ PASS 2 Comparative analysis complete")
+                else:
+                    logger.warning("⚠ Comparative analysis returned empty result")
+                
+            except Exception as e:
+                logger.error(f"✗ Comparative analysis failed: {str(e)}")
+                logger.error(traceback.format_exc())
+                # Continue without comparative analysis - not critical
+        
+        elif success_count == 1:
+            logger.info("ℹ Only 1 candidate - skipping PASS 2 comparative analysis")
+        
+        processing_time_total = (datetime.now() - start_time).total_seconds()
+        
+        # Create batch response with both PASS 1 and PASS 2 results
+        batch_response = BatchAnalyzeResponse(
+            batch_id=batch_id,
+            job_requirements=job_requirements,
+            documents=documents_results,
+            comparative_analysis=comparative_analysis,
+            job_requirements_used=bool(job_requirements.strip()),
+            job_requirements_provided=bool(job_requirements.strip()),
+            documents_count=len(documents_results),
+            success_count=success_count,
+            failed_count=failed_count,
+            processing_time=processing_time_total,
+            success=success_count > 0
+        )
+        
+        logger.info(f"=" * 70)
+        logger.info(f"✅ BATCH ANALYSIS COMPLETE (PASS 1 + PASS 2)")
+        logger.info(f"   Documents: {success_count} succeeded, {failed_count} failed")
+        logger.info(f"   Comparative analysis: {'Yes' if comparative_analysis else 'No'}")
+        logger.info(f"   Total time: {processing_time_total:.2f}s")
+        logger.info(f"=" * 70)
+        
+        return batch_response
+    
+    except HTTPException as e:
+        logger.error(f"✗ Batch validation failed: {e.detail}")
+        raise
+    
+    except Exception as e:
+        logger.error(f"✗ Batch processing failed: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    finally:
+        # Cleanup all temp files
+        for temp_path in temp_files:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+
 @app.get("/docs-info")
 def get_docs():
     """API Documentation"""
@@ -507,7 +773,8 @@ def get_docs():
             "/health": "Health check",
             "/upload": "Upload PDF and extract text",
             "/analyze": "Analyze extracted text",
-            "/process": "Complete end-to-end processing"
+            "/process": "Complete end-to-end processing",
+            "/batch-analyze": "Batch analyze up to 5 PDFs with shared job requirements"
         },
         "ports": {
             "backend": 8002,

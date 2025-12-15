@@ -78,9 +78,16 @@
 
                 <div class="upload-area" id="drop-zone">
                     <i data-lucide="file-up" class="upload-icon"></i>
-                    <h3>Drag & Drop Resume PDF</h3>
+                    <h3>Drag & Drop up to 5 Resume PDFs</h3>
                     <p>or click to browse</p>
-                    <input type="file" id="file-input" accept=".pdf" hidden>
+                    <p class="upload-hint" style="font-size: 0.9em; color: #999; margin-top: 0.5rem;">Max 5 PDFs • PDF format only</p>
+                    <input type="file" id="file-input" accept=".pdf" multiple hidden>
+                </div>
+
+                <!-- File Queue Display -->
+                <div id="file-queue" class="file-queue hidden" style="margin-top: 2rem;">
+                    <h3>Upload Queue</h3>
+                    <div id="queue-items" class="queue-items"></div>
                 </div>
 
                 <!-- Job Requirements Section -->
@@ -132,6 +139,16 @@
 
                 <div class="card full-width" id="analysis-context">
                     <!-- Analysis Context populated by JS -->
+                </div>
+
+                <!-- Batch Comparison View -->
+                <div class="card full-width" id="batch-comparison" style="display:none;">
+                    <h3><i data-lucide="grid"></i> Candidate Comparison</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <button class="btn-secondary" id="sort-by-score" style="margin-right: 0.5rem;">Sort by Score</button>
+                        <button class="btn-secondary" id="sort-by-name">Sort by Name</button>
+                    </div>
+                    <div id="comparison-table" class="comparison-table"></div>
                 </div>
             </section>
 
@@ -229,7 +246,7 @@
 
     <!-- Scripts -->
     <script type="module" src="js/three-bg.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <script src="js/main.js"></script>
     <script>
         lucide.createIcons();
     </script>

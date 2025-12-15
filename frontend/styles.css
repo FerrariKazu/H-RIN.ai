@@ -630,3 +630,95 @@ td {
 .btn-cancel:hover {
     background-color: rgba(239, 69, 101, 0.1);
 }
+
+/* Batch Comparison Table Styles */
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.comparison-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.comparison-table thead {
+    background-color: var(--bg-card);
+    border-bottom: 2px solid var(--accent);
+}
+
+.comparison-table th {
+    padding: 12px;
+    text-align: left;
+    color: var(--accent);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+}
+
+.comparison-table tr {
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.2s;
+}
+
+.comparison-table tbody tr:hover {
+    background-color: rgba(255, 137, 6, 0.05);
+}
+
+.comparison-table td {
+    padding: 12px;
+    color: var(--text-primary);
+}
+
+.comparison-table .row-success {
+    border-left: 3px solid #4CAF50;
+}
+
+.comparison-table .row-failed {
+    border-left: 3px solid #F44336;
+    opacity: 0.6;
+}
+
+/* Skill Tags */
+.skill-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.skill-tag.matched {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+}
+
+.skill-tag.missing {
+    background-color: rgba(244, 67, 54, 0.2);
+    color: #F44336;
+    border: 1px solid #F44336;
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-success {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+}
+
+.badge-failed {
+    background-color: rgba(244, 67, 54, 0.2);
+    color: #F44336;
+    border: 1px solid #F44336;
+}

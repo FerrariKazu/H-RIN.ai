@@ -1,12 +1,24 @@
 // Get API URL from window or default to localhost:8002
 let API_URL = window.VITE_API_URL || "http://localhost:8002";
 
-// State
+// State - BATCH PROCESSING
 const state = {
-    file: null,
+    files: [],                    // Multiple files
+    batchId: null,               // Unique batch identifier
     logs: [],
-    extractedData: null,
-    jobRequirements: null
+    batchResults: null,          // Results from batch analysis
+    batchDocuments: [],          // Parsed documents for sorting
+    batchSortBy: 'score',        // Current sort method
+    jobRequirements: null,
+    currentMode: 'single'       // 'single' or 'batch'
+};
+
+// Batch processing state tracking
+const batchState = {
+    queue: [],                   // Files queued for upload
+    processing: false,
+    uploaded: {},               // Uploaded files map
+    analyzed: {}                // Analyzed documents map
 };
 
 // Initialize when DOM is ready
@@ -94,6 +106,26 @@ document.addEventListener('DOMContentLoaded', function() {
         clearJobReqBtn.style.display = 'none';
     });
 
+    // Sort buttons for batch results
+    const sortByScoreBtn = document.getElementById('sort-by-score');
+    const sortByNameBtn = document.getElementById('sort-by-name');
+
+    if (sortByScoreBtn) {
+        sortByScoreBtn.addEventListener('click', () => {
+            sortBatchResults('score');
+            sortByScoreBtn.style.fontWeight = 'bold';
+            sortByNameBtn.style.fontWeight = 'normal';
+        });
+    }
+
+    if (sortByNameBtn) {
+        sortByNameBtn.addEventListener('click', () => {
+            sortBatchResults('name');
+            sortByNameBtn.style.fontWeight = 'bold';
+            sortByScoreBtn.style.fontWeight = 'normal';
+        });
+    }
+
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
@@ -101,9 +133,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function handleFiles(files) {
-        if (files.length > 0) {
-            state.file = files[0];
-            uploadFile(state.file);
+        if (files.length === 0) return;
+        
+        // VALIDATION: Max 5 files, all PDF
+        if (files.length > 5) {
+            addLog(`❌ Maximum 5 files allowed (you selected ${files.length})`);
+            return;
+        }
+        
+        const validFiles = Array.from(files).filter(f => {
+            if (!f.name.toLowerCase().endsWith('.pdf')) {
+                addLog(`⚠ Skipping ${f.name} - PDF only`);
+                return false;
+            }
+            return true;
+        });
+        
+        if (validFiles.length === 0) {
+            addLog("❌ No valid PDF files selected");
+            return;
+        }
+        
+        // BATCH MODE: Multiple files
+        state.files = validFiles;
+        state.currentMode = validFiles.length > 1 ? 'batch' : 'single';
+        
+        addLog(`📦 Batch Mode: ${validFiles.length} file${validFiles.length > 1 ? 's' : ''} queued`);
+        
+        // Show queue
+        showFileQueue(validFiles);
+        
+        // Start batch upload
+        uploadBatch(validFiles);
+    }
+
+    function showFileQueue(files) {
+        const queueEl = document.getElementById('file-queue');
+        const queueItemsEl = document.getElementById('queue-items');
+        
+        queueEl.classList.remove('hidden');
+        queueItemsEl.innerHTML = '';
+        
+        files.forEach((file, idx) => {
+            const item = document.createElement('div');
+            item.className = 'queue-item';
+            item.style.cssText = 'display:flex;justify-content:space-between;padding:0.75rem;background:#f5f5f5;margin-bottom:0.5rem;border-radius:0.5rem;border-left:3px solid #007bff;';
+            item.innerHTML = `
+                <div>
+                    <strong>${file.name}</strong>
+                    <small style="display:block;color:#666;">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                </div>
+                <div style="text-align:right;">
+                    <span class="status-badge" id="status-${idx}" style="display:inline-block;padding:0.25rem 0.75rem;background:#ffc107;color:#000;border-radius:0.25rem;font-size:0.85em;">queued</span>
+                </div>
+            `;
+            queueItemsEl.appendChild(item);
+        });
+    }
+
+    function updateQueueStatus(index, status) {
+        const badge = document.getElementById(`status-${index}`);
+        if (badge) {
+            badge.textContent = status;
+            const colorMap = {
+                'queued': '#ffc107',
+                'uploading': '#007bff',
+                'extracting': '#17a2b8',
+                'analyzing': '#6c63ff',
+                'completed': '#28a745',
+                'failed': '#dc3545'
+            };
+            badge.style.background = colorMap[status] || '#007bff';
         }
     }
 
@@ -117,91 +217,370 @@ document.addEventListener('DOMContentLoaded', function() {
         state.logs.push(msg);
     }
 
-    // API Interaction
-    async function uploadFile(file) {
+    // API Interaction - BATCH UPLOAD
+    async function uploadBatch(files) {
         // UI Reset
         logsContainer.classList.remove('hidden');
-        addLog(`🚀 Starting upload: ${file.name}`);
-        updateStatus("Processing...", "orange");
+        addLog(`🚀 BATCH MODE: Uploading ${files.length} file(s)...`);
+        updateStatus("Processing Batch...", "orange");
         
-        const formData = new FormData();
-        formData.append('file', file);
-
+        batchState.processing = true;
+        state.batchId = 'batch_' + Date.now();
+        
+        // Log job requirements
+        const jobReqsText = state.jobRequirements || "";
+        const jobReqsWords = jobReqsText.trim().length > 0 ? jobReqsText.split(/\s+/).length : 0;
+        
+        if (jobReqsText.trim().length > 0) {
+            addLog(`✓ Shared Job Requirements: ${jobReqsWords} words`);
+        } else {
+            addLog(`⚠ No job requirements - generic analysis mode`);
+        }
+        
         try {
-            // Step 1: Upload & PDF Extraction
-            addLog("📤 Sending PDF to backend...");
-            const uploadUrl = `${API_URL}/upload`;
-            console.log("Upload request URL:", uploadUrl);
+            // Send all files at once to batch endpoint
+            const formData = new FormData();
+            files.forEach((file, idx) => {
+                formData.append('files', file);
+                updateQueueStatus(idx, 'uploading');
+            });
+            formData.append('job_requirements', jobReqsText);
+            formData.append('batch_id', state.batchId);
             
-            const uploadRes = await fetch(uploadUrl, {
+            addLog("📤 Sending batch to backend...");
+            
+            const batchRes = await fetch(`${API_URL}/batch-analyze`, {
                 method: 'POST',
                 body: formData
             });
             
-            if (!uploadRes.ok) {
-                const errorText = await uploadRes.text();
-                throw new Error(`Upload failed with status ${uploadRes.status}: ${errorText}`);
-            }
-            const uploadResult = await uploadRes.json();
-            addLog(`✅ Text extracted. Length: ${uploadResult.raw_text.length} chars.`);
-            addLog(`📄 Document type: ${uploadResult.document_type}`);
-            addLog(`🔍 Confidence: ${(uploadResult.confidence * 100).toFixed(1)}%`);
-
-            // Step 2: Analysis with job requirements (MANDATORY ENFORCEMENT)
-            addLog("🧠 Running analysis pipeline...");
-            const jobReqsText = state.jobRequirements || "";
-            const jobReqsWords = jobReqsText.trim().length > 0 ? jobReqsText.split(/\s+/).length : 0;
-            
-            if (jobReqsText.trim().length > 0) {
-                addLog(`✓ Job Requirements: ${jobReqsWords} words`);
-                addLog(`📋 Context: "${jobReqsText.substring(0, 100)}${jobReqsText.length > 100 ? '...' : ''}"`);
-            } else {
-                addLog(`⚠ No job requirements provided - will use generic analysis`);
+            if (!batchRes.ok) {
+                const errorText = await batchRes.text();
+                throw new Error(`Batch failed: ${batchRes.status} - ${errorText}`);
             }
             
-            const analyzeRes = await fetch(`${API_URL}/analyze`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    filename: file.name,
-                    extracted_text: uploadResult.raw_text,
-                    enable_llm_analysis: true,
-                    job_requirements: jobReqsText
-                })
+            const batchResult = await batchRes.json();
+            state.batchResults = batchResult;
+            
+            addLog(`✅ Batch analysis complete`);
+            addLog(`📊 Results: ${batchResult.documents.length} documents processed`);
+            
+            // Update statuses
+            batchResult.documents.forEach((doc, idx) => {
+                const status = doc.status === 'success' ? 'completed' : 'failed';
+                updateQueueStatus(idx, status);
+                
+                if (doc.status === 'success') {
+                    addLog(`✓ ${doc.filename}: LLM Score ${doc.analysis?.llm_analysis?.overall_score || 'N/A'}/100`);
+                } else {
+                    addLog(`✗ ${doc.filename}: ${doc.error || 'Analysis failed'}`);
+                }
             });
             
-            if (!analyzeRes.ok) {
-                const errorText = await analyzeRes.text();
-                throw new Error(`Analysis failed with status ${analyzeRes.status}: ${errorText}`);
-            }
-            const analyzeResult = await analyzeRes.json();
+            // Render batch results
+            renderBatchResults(batchResult);
+            updateStatus("Batch Complete", "var(--success)");
+            addLog("🎉 Batch Analysis Finished Successfully");
             
-            addLog(`✅ Analysis complete`);
-            if (analyzeResult.llm_analysis) {
-                addLog(`📊 LLM Score: ${analyzeResult.llm_analysis.ai_score || 'N/A'}/100`);
-            }
-            
-            // Finalize
-            state.extractedData = {
-                upload: uploadResult,
-                nlp: analyzeResult.resume_json || {},
-                struct: analyzeResult.resume_json || {},
-                ml: analyzeResult.llm_analysis || {},
-                report: { html: analyzeResult.resume_markdown }
-            };
-            
-            renderResults();
-            updateStatus("Analysis Complete", "var(--success)");
-            addLog("🎉 Pipeline Finished Successfully.");
-            
-            // Enable nav
+            // Enable navigation
             navBtns.forEach(btn => btn.removeAttribute('disabled'));
-
+            
         } catch (err) {
             console.error(err);
-            addLog(`❌ Error: ${err.message}`);
-            updateStatus("Failed", "var(--error)");
+            addLog(`❌ Batch Error: ${err.message}`);
+            updateStatus("Batch Failed", "var(--error)");
+            batchState.processing = false;
         }
+    }
+
+    // Render Batch Results - Display comparison view (PASS 1 + PASS 2)
+    function renderBatchResults(batchResult) {
+        const comparisonTable = document.getElementById('comparison-table');
+        if (!comparisonTable) {
+            addLog("❌ Comparison table element not found");
+            return;
+        }
+
+        const documents = batchResult.documents || [];
+        if (documents.length === 0) {
+            comparisonTable.innerHTML = '<p>No documents processed</p>';
+            return;
+        }
+
+        // Store for sorting and comparative analysis
+        state.batchDocuments = [...documents];
+        state.batchSortBy = 'score';
+        state.comparativeAnalysis = batchResult.comparative_analysis || null;
+
+        // PASS 1: Render individual candidate results
+        renderComparisonView(documents);
+
+        // PASS 2: Render comparative analysis if available
+        if (batchResult.comparative_analysis && documents.length > 1) {
+            renderComparativeAnalysis(batchResult.comparative_analysis, documents);
+            addLog(`✅ PASS 2 Complete: Comparative analysis generated for ${documents.length} candidates`);
+        } else if (documents.length === 1) {
+            addLog(`ℹ Single candidate - comparative analysis not applicable`);
+        }
+
+        // Show comparison section
+        const comparisonSection = document.getElementById('batch-comparison');
+        if (comparisonSection) {
+            comparisonSection.style.display = 'block';
+        }
+
+        addLog(`📊 Displaying PASS 1 + PASS 2 results for ${documents.length} candidate(s)`);
+    }
+
+    function renderComparisonView(documents) {
+        const comparisonTable = document.getElementById('comparison-table');
+        if (!comparisonTable) return;
+
+        let html = `
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Status</th>
+                        <th>Overall Score</th>
+                        <th>Matched Skills</th>
+                        <th>Missing Skills</th>
+                        <th>Experience</th>
+                        <th>Fit Assessment</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        documents.forEach(doc => {
+            if (doc.status !== 'success') {
+                html += `
+                    <tr class="row-failed">
+                        <td>${doc.filename || 'Unknown'}</td>
+                        <td><span class="badge badge-failed">❌ Failed</span></td>
+                        <td colspan="5">${doc.error || 'Processing failed'}</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const analysis = doc.analysis?.llm_analysis || {};
+            const overallScore = analysis.overall_score || 0;
+            const matchedSkills = analysis.matched_skills || [];
+            const missingSkills = analysis.missing_skills || [];
+            const experience = analysis.experience_assessment || 'Not assessed';
+
+            // Color code score
+            const scoreColor = overallScore >= 75 ? '#4CAF50' : overallScore >= 50 ? '#FF9800' : '#F44336';
+
+            html += `
+                <tr class="row-success">
+                    <td>
+                        <strong>${doc.filename || 'Resume'}</strong>
+                        <br><small>ID: ${doc.document_id}</small>
+                    </td>
+                    <td><span class="badge badge-success">✓ Success</span></td>
+                    <td>
+                        <div style="font-size: 18px; font-weight: bold; color: ${scoreColor};">
+                            ${overallScore}/100
+                        </div>
+                    </td>
+                    <td>
+                        <div style="max-width: 150px;">
+                            ${matchedSkills.length > 0 ? matchedSkills.map(s => `<span class="skill-tag matched">${s}</span>`).join('') : '<em>None</em>'}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="max-width: 150px;">
+                            ${missingSkills.length > 0 ? missingSkills.map(s => `<span class="skill-tag missing">${s}</span>`).join('') : '<em>All matched</em>'}
+                        </div>
+                    </td>
+                    <td>${experience}</td>
+                    <td>${analysis.fit_assessment || 'Pending'}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        comparisonTable.innerHTML = html;
+    }
+
+    function renderComparativeAnalysis(comparativeData, documents) {
+        // Create or get comparative analysis section
+        let compSection = document.getElementById('comparative-analysis-section');
+        if (!compSection) {
+            compSection = document.createElement('div');
+            compSection.id = 'comparative-analysis-section';
+            compSection.className = 'card full-width';
+            compSection.style.marginTop = '2rem';
+            document.getElementById('batch-comparison')?.parentElement?.appendChild(compSection);
+        }
+
+        const ranking = comparativeData.comparative_ranking || [];
+        const strengths = comparativeData.strengths_comparison || '';
+        const weaknesses = comparativeData.weaknesses_comparison || '';
+        const skillMatrix = comparativeData.skill_coverage_matrix || {};
+        const strongest = comparativeData.strongest_candidate || {};
+        const hiring = comparativeData.hiring_recommendations || {};
+        const executive = comparativeData.executive_summary || '';
+
+        // Build comparative analysis HTML
+        let html = `
+            <h3><i data-lucide="trending-up"></i> PASS 2: Comparative Cross-Candidate Analysis</h3>
+            
+            <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                <strong>Executive Summary:</strong>
+                <p>${executive}</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
+                <!-- Comparative Ranking -->
+                <div>
+                    <h4>📊 Final Ranking (Normalized)</h4>
+                    <table style="width: 100%; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
+                                <th style="padding: 0.5rem; text-align: left;">Rank</th>
+                                <th style="padding: 0.5rem; text-align: left;">Candidate</th>
+                                <th style="padding: 0.5rem; text-align: right;">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        ranking.forEach((item, idx) => {
+            const docId = item.document_id || '';
+            const rankNum = item.rank || (idx + 1);
+            const score = item.normalized_fit_score || 0;
+            const candidate = documents.find(d => d.document_id === docId);
+            const name = candidate?.filename || 'Unknown';
+            const scoreColor = score >= 75 ? '#4CAF50' : score >= 50 ? '#FF9800' : '#F44336';
+
+            html += `
+                            <tr style="border-bottom: 1px solid var(--border);">
+                                <td style="padding: 0.5rem; font-weight: bold; color: var(--accent);">🥇 #${rankNum}</td>
+                                <td style="padding: 0.5rem;">${name}</td>
+                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">${score}/100</td>
+                            </tr>
+            `;
+        });
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Strongest Candidate -->
+                <div>
+                    <h4>🏆 Top Candidate</h4>
+                    <div style="background: var(--bg-card); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+                        <strong>${strongest.document_id || 'N/A'}</strong>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            ${strongest.reason || 'Highest overall fit'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strengths Comparison -->
+            <div style="background: rgba(76, 175, 80, 0.1); border-left: 3px solid #4CAF50; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                <h4 style="color: #4CAF50; margin-top: 0;">💪 Strengths Comparison</h4>
+                <p>${strengths}</p>
+            </div>
+
+            <!-- Weaknesses Comparison -->
+            <div style="background: rgba(244, 67, 54, 0.2); border-left: 3px solid #F44336; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
+                <h4 style="color: #F44336; margin-top: 0;">⚠️ Weaknesses Comparison</h4>
+                <p>${weaknesses}</p>
+            </div>
+
+            <!-- Skill Coverage Matrix -->
+            <div>
+                <h4>🎯 Skill Coverage Matrix</h4>
+                <table style="width: 100%; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
+                            <th style="padding: 0.5rem; text-align: left;">Candidate</th>
+                            <th style="padding: 0.5rem; text-align: left;">Covered Skills</th>
+                            <th style="padding: 0.5rem; text-align: left;">Missing Skills</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        Object.entries(skillMatrix).forEach(([docId, skills]) => {
+            const covered = (skills.covered || []).slice(0, 3).join(', ');
+            const missing = (skills.missing || []).slice(0, 3).join(', ');
+            
+            html += `
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 0.5rem; font-weight: bold;">${docId}</td>
+                            <td style="padding: 0.5rem; color: #4CAF50;">✓ ${covered || 'N/A'}</td>
+                            <td style="padding: 0.5rem; color: #F44336;">✗ ${missing || 'N/A'}</td>
+                        </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Hiring Recommendations -->
+            <div style="margin-top: 1.5rem;">
+                <h4>💼 Tailored Hiring Recommendations</h4>
+        `;
+
+        Object.entries(hiring).forEach(([docId, rec]) => {
+            html += `
+                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
+                    <strong>${docId}:</strong>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem;">${rec}</p>
+                </div>
+            `;
+        });
+
+        html += `
+            </div>
+        `;
+
+        compSection.innerHTML = html;
+        
+        // Initialize Lucide icons in the new section
+        try {
+            lucide.createIcons();
+        } catch (e) {
+            console.log("Lucide icons not available");
+        }
+    }
+
+    function sortBatchResults(sortBy) {
+        if (!state.batchDocuments) return;
+
+        let sorted = [...state.batchDocuments];
+
+        if (sortBy === 'score') {
+            sorted.sort((a, b) => {
+                const scoreA = a.analysis?.llm_analysis?.overall_score || 0;
+                const scoreB = b.analysis?.llm_analysis?.overall_score || 0;
+                return scoreB - scoreA; // Descending
+            });
+            state.batchSortBy = 'score';
+        } else if (sortBy === 'name') {
+            sorted.sort((a, b) => {
+                const nameA = (a.filename || 'Unknown').toLowerCase();
+                const nameB = (b.filename || 'Unknown').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            state.batchSortBy = 'name';
+        }
+
+        renderComparisonView(sorted);
+        addLog(`📊 Sorted by ${sortBy}`);
     }
 
     function updateStatus(text, color) {
