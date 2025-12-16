@@ -324,6 +324,31 @@ section {
     padding: 1.5rem;
 }
 
+/* Ensure text in light-background inner containers is dark for readability */
+.card div[style*="background: #f8f9fa"],
+.card div[style*="background:#f8f9fa"],
+.card div[style*="background: #f5f5f5"],
+.card div[style*="background: rgba(255,255,255"],
+.card .content-text,
+.review-card-email,
+.review-card-reasoning,
+div[style*="background: #f8f9fa"] *,
+div[style*="background: #f5f5f5"] *,
+div[style*="background: rgba(255,255,255"] * {
+    color: #333 !important;
+}
+
+/* Ensure proper text color for specific elements */
+.card strong,
+.review-card-name {
+    color: var(--text-primary) !important;
+}
+
+/* Profile summary divs should have dark text */
+.card div[style*="padding: 1rem"] {
+    color: #333;
+}
+
 .card h1 {
     margin-bottom: 1.5rem;
     margin-top: 0;
@@ -721,4 +746,172 @@ td {
     background-color: rgba(244, 67, 54, 0.2);
     color: #F44336;
     border: 1px solid #F44336;
+}
+
+/* ================================================
+   REVIEW SECTION STYLES (Batch Mode)
+   ================================================ */
+
+.review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+.review-card {
+    background: rgba(30, 30, 36, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.review-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+}
+
+.review-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 32px rgba(255, 137, 6, 0.15);
+}
+
+.review-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.review-card-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.review-card-email {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0.25rem 0;
+}
+
+.review-score-badge {
+    min-width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent) 0%, #ff6b00 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(255, 137, 6, 0.3);
+}
+
+.review-card-links {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.review-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.review-link:hover {
+    background: rgba(255, 137, 6, 0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.review-link.linkedin:hover {
+    border-color: #0077B5;
+    color: #0077B5;
+    background: rgba(0, 119, 181, 0.1);
+}
+
+.review-link.github:hover {
+    border-color: #fff;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.review-card-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.btn-accept,
+.btn-reject {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-accept {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+}
+
+.btn-accept:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
+}
+
+.btn-reject {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.5);
+    color: #F44336;
+}
+
+.btn-reject:hover {
+    background: rgba(244, 67, 54, 0.2);
+    border-color: #F44336;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3);
+}
+
+.review-card-reasoning {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 1rem 0;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
 }

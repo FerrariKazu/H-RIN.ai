@@ -55,8 +55,8 @@
                 <button class="nav-btn" data-section="analysis-section" disabled>
                     <i data-lucide="bar-chart-2"></i> ML Analysis
                 </button>
-                <button class="nav-btn" data-section="json-section" disabled>
-                    <i data-lucide="code"></i> Raw JSON
+                <button class="nav-btn" data-section="review-section" disabled>
+                    <i data-lucide="check-circle"></i> Review
                 </button>
             </nav>
 
@@ -210,10 +210,16 @@
                 <div id="roles-list" class="tags-list"></div>
             </section>
 
-            <!-- Section: JSON -->
-            <section id="json-section" class="hidden-section">
-                <h2>Raw Reconstruction</h2>
-                <pre id="json-display" class="code-block"></pre>
+            <!-- Section: Review (Replaces Raw JSON) -->
+            <section id="review-section" class="hidden-section">
+                <header class="section-header">
+                    <h2><i data-lucide="check-circle"></i> Candidate Review</h2>
+                    <p class="section-hint">Review candidates and send personalized emails</p>
+                </header>
+                
+                <div id="review-candidates" class="review-grid">
+                    <!-- Candidate cards will be injected here by JavaScript -->
+                </div>
             </section>
 
         </main>

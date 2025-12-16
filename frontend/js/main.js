@@ -1,4 +1,3 @@
-<initial_code>
 // Get API URL from window or default to localhost:8002
 let API_URL = window.VITE_API_URL || "http://localhost:8002";
 
@@ -246,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateQueueStatus(idx, 'uploading');
             });
             formData.append('job_requirements', jobReqsText);
-            formData.append('batch_id',  date.now());
+            formData.append('batch_id',  Date.now());
             
             addLog("📤 Sending batch to backend...");
             
@@ -312,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Render Batch Results - Display comparison view (PASS 1 + PASS 2)
     function renderBatchResults(batchResult) {
         // STEP 1: Check response mode
-        const mode = batchResult.mode || "batch";  // Default to batch for backwards compatibility
+        const mode = batchResult.mode || "batch";
         const comparisonSection = document.getElementById('batch-comparison');
         
         if (!comparisonSection) {
@@ -326,66 +325,105 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const candidate = batchResult.candidate || {};
             const llmAnalysis = candidate.llm_analysis || {};
+            const aiAssessment = batchResult.ai_executive_assessment || "No assessment available.";
+            const expSummary = batchResult.experience_summary || "No experience summary available.";
             
             let html = `
-                <h2>Candidate Analysis</h2>
+                <h2>Executive Candidate Analysis</h2>
                 
-                <div class="card">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                        <div>
-                            <strong>Candidate Name:</strong><br>
-                            ${llmAnalysis.candidate_name || candidate.filename || "Unknown"}
-                        </div>
-                        <div>
-                            <strong>Seniority Level:</strong><br>
-                            ${llmAnalysis.seniority_level || "Not assessed"}
-                        </div>
+                <!-- 1. AI Executive Assessment (Full Width) -->
+                <div class="card" style="background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%); color: white; margin-bottom: 2rem;">
+                    <h3 style="margin-top: 0; display: flex; align-items: center;">
+                        <span style="font-size: 1.5em; margin-right: 0.5rem;">🧠</span> 
+                        AI Executive Assessment
+                    </h3>
+                    <div class="markdown-content" style="font-size: 1.1em; line-height: 1.6;">
+                        ${formatMarkdown(aiAssessment)}
                     </div>
+                </div>
+
+                <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
                     
-                    <div style="background: #f5f5f5; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
-                        <strong>Executive Summary:</strong>
-                        <p>${llmAnalysis.executive_summary || "No summary available"}</p>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
-                        <div>
-                            <strong>Overall Score: </strong>
-                            <div style="font-size: 2.5rem; font-weight: bold; color: ${getScoreColor(llmAnalysis.overall_score || 0)};">
-                                ${llmAnalysis.overall_score || 0}/100
+                    <!-- 2. Candidate Profile -->
+                    <div class="card" style="border-top: 4px solid #007bff;">
+                        <h3>👤 Candidate Profile</h3>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div>
+                                <h4 style="margin: 0; font-size: 1.3em;">${llmAnalysis.candidate_name || candidate.filename || "Unknown"}</h4>
+                                <p style="color: #666; margin: 0.2rem 0;">${llmAnalysis.seniority_level || "Seniority Unknown"}</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 2.5rem; font-weight: bold; color: ${getScoreColor(llmAnalysis.overall_score || 0)};">
+                                    ${llmAnalysis.overall_score || 0}
+                                </div>
+                                <small>Overall Score</small>
                             </div>
                         </div>
+
+                    <!-- named entities rendering -->
+                    <div style="margin-top: 2rem;">
+                        <strong>Extracted Entities (NLP):</strong>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                            
+                            ${Object.keys(candidate.named_entities || {}).map(category => {
+                                const entities = candidate.named_entities[category];
+                                if (!entities || entities.length === 0 || category === 'contact') return '';
+                                
+                                const iconMap = {
+                                    'organizations': '🏢',
+                                    'persons': '👤',
+                                    'locations': '📍',
+                                    'dates': '📅'
+                                };
+                                
+                                return `
+                                    <div style="background: rgba(255,255,255,0.05); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border);">
+                                        <div style="font-weight: bold; margin-bottom: 0.5rem; text-transform: capitalize; color: var(--accent);">
+                                            ${iconMap[category] || '🔹'} ${category}
+                                        </div>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                                            ${entities.map(e => `
+                                                <span style="font-size: 0.85em; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary);">
+                                                    ${e.text || e}
+                                                </span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <strong>Strengths:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${(llmAnalysis.strengths || []).map(s => `<span class="skill-tag matched">${s}</span>`).join("")}
+                            </div>
+                        </div>
+
                         <div>
-                            <strong>Fit Assessment:</strong><br>
-                            ${llmAnalysis.role_fit_verdict?.recommendation || "Pending"}<br>
-                            <small>${llmAnalysis.role_fit_verdict?.rationale || ""}</small>
+                            <strong>Weaknesses:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${(llmAnalysis.weaknesses || []).map(s => `<span class="skill-tag missing">${s}</span>`).join("")}
+                            </div>
                         </div>
                     </div>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <strong>Strengths:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${(llmAnalysis.strengths || []).map(s => `<span class="skill-tag matched">${s}</span>`).join("")}
+
+                    <!-- 3. Experience Summary -->
+                    <div class="card" style="border-top: 4px solid #28a745;">
+                        <h3>📅 Experience Summary</h3>
+                        <div class="markdown-content" style="font-size: 1.05em; line-height: 1.6; color: #333;">
+                             ${formatMarkdown(expSummary)}
                         </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <strong>Weaknesses:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${(llmAnalysis.weaknesses || []).map(s => `<span class="skill-tag missing">${s}</span>`).join("")}
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 1.5rem;">
-                        <strong>Recommended Roles:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${(llmAnalysis.recommended_roles || []).map(r => `<span class="badge badge-success">${r}</span>`).join("")}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <strong>Critical Gaps:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${(llmAnalysis.critical_gaps || []).map(g => `<span class="skill-tag missing">⚠ ${g}</span>`).join("")}
+                        
+                        <div style="margin-top: 2rem;">
+                            <strong>Detailed Metrics:</strong>
+                            <ul style="margin-top: 0.5rem; color: #555;">
+                                <li><strong>Years of Experience:</strong> ${llmAnalysis.key_metrics?.years_experience || candidate.years_experience || "N/A"}</li>
+                                <li><strong>Leadership Exp:</strong> ${llmAnalysis.key_metrics?.leadership_experience || "N/A"}</li>
+                                <li><strong>Education:</strong> ${llmAnalysis.education_quality || "Not rated"}</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -394,9 +432,283 @@ document.addEventListener('DOMContentLoaded', function() {
             comparisonSection.innerHTML = html;
             comparisonSection.style.display = 'block';
             
-            addLog(`✅ Single-CV analysis complete for: ${candidate.filename || "Resume"}`);
+            // Render specific Skills & NLP section (hidden by default, accessible via nav)
+            renderSkillsAndNLP(candidate);
+            
+            // Render ML Analysis Section
+            renderMLAnalysis(candidate);
+            
             return;
         }
+
+    // Helper: Enhanced Markdown Formatter for AI Assessment
+    function formatMarkdown(text) {
+        if (!text) return "";
+        
+        const sections = text.split('\n\n');
+        return sections.map(section => {
+            section = section.trim();
+            if (!section) return "";
+            
+            // Parse markdown with proper spacing
+            section = section
+                // #### Headings (h4)
+                .replace(/^#### (.*$)/gim, '<h4 style="margin-top: 1.5rem; margin-bottom: 0.8rem; font-size: 1.15em; font-weight: 600; color: inherit; padding-bottom: 0.3rem; border-bottom: 2px solid rgba(255,255,255,0.2);">$1</h4>')
+                // ### Headings (h3)
+                .replace(/^### (.*$)/gim, '<h4 style="margin-top: 1.2rem; margin-bottom: 0.5rem; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 0.2rem;">$1</h4>')
+                // **Field:** patterns (bold field names)
+                .replace(/\*\*([^:]+):\*\*/gim, '<strong style="color: inherit; font-weight: 600;">$1:</strong>')
+                // **Bold** (general)
+                .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+
+            // List handling with proper spacing
+            if (section.match(/^\s*[-\*]\s+/m)) {
+                const items = section.split('\n').filter(l => l.trim().match(/^\s*[-\*]\s+/));
+                const listItems = items.map(i => {
+                    const content = i.replace(/^\s*[-\*]\s+/, '');
+                    return `<li style="margin-bottom: 0.4rem; line-height: 1.6;">${content}</li>`;
+                }).join('');
+                return `<ul style="margin: 0.8rem 0 1.2rem 1.5rem; padding-left: 0; list-style-type: disc;">${listItems}</ul>`;
+            }
+            
+            // If it starts with a tag, return as is
+            if (section.startsWith('<h')) return section;
+            
+            // Wrap in paragraph with proper spacing
+            return `<p style="margin-bottom: 0.8rem; line-height: 1.6;">${section}</p>`;
+        }).join('');
+    }
+
+    function renderMLAnalysis(candidate) {
+        const analysis = candidate.llm_analysis || {};
+        
+        // 1. AI Fit Score
+        const scoreCircle = document.getElementById('ai-score-circle');
+        if (scoreCircle) {
+            const score = analysis.overall_score || 0;
+            scoreCircle.textContent = score;
+            scoreCircle.style.background = `conic-gradient(${getScoreColor(score)} ${score}%, #333 0)`;
+            scoreCircle.style.color = getScoreColor(score);
+        }
+
+        // 2. Evaluation Factors
+        const factorsList = document.getElementById('ml-factors-list');
+        if (factorsList) {
+            let html = '';
+            
+            // Strengths
+            (analysis.strengths || []).slice(0, 3).forEach(s => {
+                html += `<li><span style="color: #4CAF50;">✅</span> ${s}</li>`;
+            });
+            
+            // Weaknesses
+            (analysis.weaknesses || []).slice(0, 2).forEach(w => {
+                html += `<li><span style="color: #F44336;">⚠️</span> ${w}</li>`;
+            });
+            
+            // Opportunities
+            (analysis.opportunities || []).slice(0, 2).forEach(o => {
+                html += `<li><span style="color: #2196F3;">💡</span> ${o}</li>`;
+            });
+            
+            factorsList.innerHTML = html || '<li>No evaluation factors available</li>';
+        }
+
+        // 3. Recommended Roles
+        const rolesList = document.getElementById('roles-list');
+        if (rolesList) {
+            const roles = analysis.recommended_roles || [];
+            
+            rolesList.innerHTML = roles.map(role => {
+                // Handle both new object format and old string format
+                const title = typeof role === 'string' ? role : role.role;
+                const score = typeof role === 'string' ? null : role.fit_score;
+                const reasoning = typeof role === 'string' ? '' : role.reasoning;
+                
+                return `
+                    <div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--accent); white-space: normal;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <h4 style="margin: 0; color: white;">${title}</h4>
+                            ${score ? `<span class="badge" style="background: ${getScoreColor(score)}; color: black; font-weight: bold;">${score}% Match</span>` : ''}
+                        </div>
+                        ${reasoning ? `<p style="font-size: 0.9em; color: #ccc; margin: 0;">${reasoning}</p>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    function renderSkillsAndNLP(candidate) {
+        // 1. Populate Skills Cloud
+        const skillsCloud = document.getElementById('skills-cloud');
+        if (skillsCloud) {
+            const skills = candidate.skills || [];
+            if (skills.length > 0) {
+                skillsCloud.innerHTML = skills.map(s => {
+                    const skillName = typeof s === 'string' ? s : s.skill;
+                    // Optional: Use confidence/category if available (from dict)
+                    return `<span class="skill-tag">${skillName}</span>`;
+                }).join('');
+            } else {
+                skillsCloud.innerHTML = '<p class="content-text">No skills extracted.</p>';
+            }
+        }
+
+        // 2. Populate Named Entities Table
+        const entitiesTableBody = document.querySelector('#entities-table tbody');
+        if (entitiesTableBody) {
+            const entities = candidate.named_entities || {};
+            let rows = '';
+            
+            // Flatten entities for table: {category: [list]} -> list of rows
+            ['organizations', 'persons', 'locations', 'dates'].forEach(category => {
+                const items = entities[category] || [];
+                items.forEach(item => {
+                    const text = typeof item === 'string' ? item : item.text;
+                    const confidence = typeof item === 'string' ? 'N/A' : (item.confidence || 0.8).toFixed(2);
+                    
+                    rows += `
+                        <tr>
+                            <td>${text}</td>
+                            <td><span class="badge badge-success">${category}</span></td>
+                            <td>${confidence}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            if (rows) {
+                entitiesTableBody.innerHTML = rows;
+            } else {
+                entitiesTableBody.innerHTML = '<tr><td colspan="3">No named entities found.</td></tr>';
+            }
+        }
+    }
+
+    // ========================================================
+    // REVIEW SECTION (Batch Mode - Replaces Raw JSON)
+    // ========================================================
+    function renderReviewSection(candidates) {
+        const reviewContainer = document.getElementById('review-candidates');
+        if (!reviewContainer) return;
+
+        // Store candidates globally for email generation
+        window.reviewCandidates = candidates;
+
+        let html = '';
+        
+        candidates.forEach((candidate, index) => {
+            const name = candidate.name || candidate.filename || 'Unknown Candidate';
+            const email = candidate.email || 'noemail@example.com';
+            const score = candidate.job_fit_score || candidate.llm_analysis?.overall_score || 0;
+            const reasoning = candidate.job_fit_reasoning || candidate.llm_analysis?.role_fit_verdict?.rationale || 'No reasoning available';
+            const linkedin = candidate.linkedin || '';
+            const github = candidate.github || '';
+            const weaknesses = candidate.llm_analysis?.weaknesses || [];
+            
+            html += `
+                <div class="review-card">
+                    <div class="review-card-header">
+                        <div>
+                            <h3 class="review-card-name">${name}</h3>
+                            <p class="review-card-email">${email}</p>
+                        </div>
+                        <div class="review-score-badge" style="background: ${getScoreBadgeGradient(score)};">
+                            ${score}
+                        </div>
+                    </div>
+                    
+                    <div class="review-card-links">
+                        ${linkedin ? `<a href="${linkedin.startsWith('http') ? linkedin : 'https://' + linkedin}" target="_blank" class="review-link linkedin"><i data-lucide="linkedin"></i> LinkedIn</a>` : ''}
+                        ${github ? `<a href="${github.startsWith('http') ? github : 'https://' + github}" target="_blank" class="review-link github"><i data-lucide="github"></i> GitHub</a>` : ''}
+                    </div>
+                    
+                    <div class="review-card-reasoning">
+                        <strong>Fit Analysis:</strong> ${reasoning}
+                    </div>
+                    
+                    <div class="review-card-actions">
+                        <button class="btn-accept" onclick="sendAcceptEmail(${index})">
+                            <i data-lucide="check"></i> Accept
+                        </button>
+                        <button class="btn-reject" onclick="sendRejectEmail(${index})">
+                            <i data-lucide="x"></i> Reject
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        reviewContainer.innerHTML = html;
+        
+        // Re-initialize Lucide icons for the new buttons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    function getScoreBadgeGradient(score) {
+        if (score >= 75) return 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
+        if (score >= 50) return 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)';
+        return 'linear-gradient(135deg, #F44336 0%, #D32F2F 100%)';
+    }
+
+    // Email Template Functions (Global for onclick access)
+    window.sendAcceptEmail = function(candidateIndex) {
+        const candidate = window.reviewCandidates[candidateIndex];
+        if (!candidate) return;
+        
+        const name = candidate.name || 'Candidate';
+        const email = candidate.email || '';
+        
+        const subject = encodeURIComponent('Application Outcome – RIN.ai');
+        const body = encodeURIComponent(`Dear ${name},
+
+We are pleased to inform you that your profile aligns strongly with our current requirements.
+
+Your experience and skills stood out during our review, and we would be happy to move forward with the next steps.
+
+Thank you for your time and interest.
+
+Kind regards,
+RIN.ai Team
+
+---
+Powered by RIN.ai - Advanced Resume Analysis`);
+        
+        window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+    };
+
+    window.sendRejectEmail = function(candidateIndex) {
+        const candidate = window.reviewCandidates[candidateIndex];
+        if (!candidate) return;
+        
+        const name = candidate.name || 'Candidate';
+        const email = candidate.email || '';
+        const weaknesses = candidate.llm_analysis?.weaknesses || ['General skill development'];
+        
+        // Format weaknesses as bullet points
+        const gapsText = weaknesses.slice(0, 3).map(w => `- ${w}`).join('\n');
+        
+        const subject = encodeURIComponent('Application Update – RIN.ai');
+        const body = encodeURIComponent(`Dear ${name},
+
+Thank you for taking the time to apply.
+
+After careful review, we have decided not to proceed at this time.
+Key areas for improvement include:
+${gapsText}
+
+We encourage you to continue developing these areas and wish you success in your career.
+
+Kind regards,
+RIN.ai Team
+
+---
+Powered by RIN.ai - Advanced Resume Analysis`);
+        
+        window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+    };
 
         // BATCH MODE: Display comparison table and comparative analysis
         addLog(`📊 BATCH MODE: Displaying ${batchResult.documents_count} candidates with comparison`);
@@ -433,243 +745,69 @@ document.addEventListener('DOMContentLoaded', function() {
         comparisonSection.innerHTML = html;
         comparisonSection.style.display = 'block';
 
+        // BATCH MODE: Also populate Review section for HR workflow
+        renderReviewSection(documents);
+
+        // BATCH MODE: Aggregate and show all skills from all candidates
+        const aggregatedSkills = new Set();
+        const aggregatedEntities = {
+            organizations: [],
+            persons: [],
+            locations: [],
+            dates: []
+        };
+        
+        documents.forEach(doc => {
+            // Aggregate skills
+            if (doc.skills && Array.isArray(doc.skills)) {
+                doc.skills.forEach(skill => {
+                    const skillName = typeof skill === 'string' ? skill : skill.skill || skill;
+                    if (skillName) aggregatedSkills.add(skillName);
+                });
+            }
+            
+            // Aggregate entities
+            if (doc.named_entities) {
+                Object.keys(aggregatedEntities).forEach(category => {
+                    if (doc.named_entities[category]) {
+                        aggregatedEntities[category].push(...doc.named_entities[category]);
+                    }
+                });
+            }
+        });
+        
+        // Deduplicate entities
+        Object.keys(aggregatedEntities).forEach(category => {
+            const seen = new Set();
+            aggregatedEntities[category] = aggregatedEntities[category].filter(item => {
+                const text = typeof item === 'string' ? item : item.text;
+                if (seen.has(text.toLowerCase())) return false;
+                seen.add(text.toLowerCase());
+                return true;
+            });
+        });
+        
+        // Render aggregated skills and entities
+        renderSkillsAndNLP({
+            skills: Array.from(aggregatedSkills),
+            named_entities: aggregatedEntities
+        });
+
         addLog(`📊 Rendering results for ${documents.length} candidate(s)`);
     }
     
-    function getScoreColor(score) {
-        if (score >= 75) return '#4CAF50';  // Green
-        if (score >= 50) return '#FF9800';  // Orange
-        return '#F44336';  // Red
-    }
-    
-    function renderComparisonViewHTML(documents) {
-        let html = `
-            <h3>PASS 1: Individual Candidate Analysis</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Candidate</th>
-                        <th>Status</th>
-                        <th>Overall Score</th>
-                        <th>Matched Skills</th>
-                        <th>Missing Skills</th>
-                        <th>Experience</th>
-                        <th>Fit Assessment</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        documents.forEach(doc => {
-            if (doc.status !== 'success') {
-                html += `
-                    <tr class="row-failed">
-                        <td>${doc.filename || 'Unknown'}</td>
-                        <td><span class="badge badge-failed">❌ Failed</span></td>
-                        <td colspan="5">${doc.error || 'Processing failed'}</td>
-                    </tr>
-                `;
-                return;
-            }
-
-            const analysis = doc.analysis?.llm_analysis || {};
-            const overallScore = analysis.overall_score || 0;
-            const matchedSkills = analysis.matched_skills || [];
-            const missingSkills = analysis.missing_skills || [];
-            const experience = analysis.experience_assessment || 'Not assessed';
-
-            // Color code score
-            const scoreColor = overallScore >= 75 ? '#4CAF50' : overallScore >= 50 ? '#FF9800' : '#F44336';
-
-            html += `
-                <tr class="row-success">
-                    <td>
-                        <strong>${doc.filename || 'Resume'}</strong>
-                        <br><small>ID: ${doc.document_id}</small>
-                    </td>
-                    <td><span class="badge badge-success">✓ Success</span></td>
-                    <td>
-                        <div style="font-size: 18px; font-weight: bold; color: ${scoreColor};">
-                            ${overallScore}/100
-                        </div>
-                    </td>
-                    <td>
-                        <div style="max-width: 150px;">
-                            ${matchedSkills.length > 0 ? matchedSkills.map(s => `<span class="skill-tag matched">${s}</span>`).join('') : '<em>None</em>'}
-                        </div>
-                    </td>
-                    <td>
-                        <div style="max-width: 150px;">
-                            ${missingSkills.length > 0 ? missingSkills.map(s => `<span class="skill-tag missing">${s}</span>`).join('') : '<em>All matched</em>'}
-                        </div>
-                    </td>
-                    <td>${experience}</td>
-                    <td>${analysis.fit_assessment || 'Pending'}</td>
-                </tr>
-            `;
-        });
-
-        html += `
-                </tbody>
-            </table>
-        `;
-        
-        return html;
-    }
-    
-    function renderComparativeAnalysisHTML(comparativeData, documents) {
-        // Create or get comparative analysis section
-        let compSection = document.getElementById('comparative-analysis-section');
-        if (!compSection) {
-            compSection = document.createElement('div');
-            compSection.id = 'comparative-analysis-section';
-            compSection.className = 'card full-width';
-            compSection.style.marginTop = '2rem';
-            document.getElementById('batch-comparison')?.parentElement?.appendChild(compSection);
-        }
-
-        const ranking = comparativeData.comparative_ranking || [];
-        const strengths = comparativeData.strengths_comparison || '';
-        const weaknesses = comparativeData.weaknesses_comparison || '';
-        const skillMatrix = comparativeData.skill_coverage_matrix || {};
-        const strongest = comparativeData.strongest_candidate || {};
-        const hiring = comparativeData.hiring_recommendations || {};
-        const executive = comparativeData.executive_summary || '';
-
-        // Build comparative analysis HTML
-        let html = `
-            <h3><i data-lucide="trending-up"></i> PASS 2: Comparative Cross-Candidate Analysis</h3>
-            
-            <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                <strong>Executive Summary:</strong>
-                <p>${executive}</p>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
-                <!-- Comparative Ranking -->
-                <div>
-                    <h4>📊 Final Ranking (Normalized)</h4>
-                    <table style="width: 100%; font-size: 0.9rem;">
-                        <thead>
-                            <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
-                                <th style="padding: 0.5rem; text-align: left;">Rank</th>
-                                <th style="padding: 0.5rem; text-align: left;">Candidate</th>
-                                <th style="padding: 0.5rem; text-align: right;">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        ranking.forEach((item, idx) => {
-            const docId = item.document_id || '';
-            const rankNum = item.rank || (idx + 1);
-            const score = item.normalized_fit_score || 0;
-            const candidate = documents.find(d => d.document_id === docId);
-            const name = candidate?.filename || 'Unknown';
-            const scoreColor = score >= 75 ? '#4CAF50' : score >= 50 ? '#FF9800' : '#F44336';
-
-            html += `
-                            <tr style="border-bottom: 1px solid var(--border);">
-                                <td style="padding: 0.5rem; font-weight: bold; color: var(--accent);">🥇 #${rankNum}</td>
-                                <td style="padding: 0.5rem;">${name}</td>
-                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
-                                    ${score}/100
-                                </td>
-                            </tr>
-            `;
-        });
-
-        html += `
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Top Candidate -->
-                <div>
-                    <h4>🏆 Top Candidate</h4>
-                    <div style="background: var(--bg-card); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border);">
-                        <strong>${strongest.document_id || 'N/A'}</strong>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                            ${strongest.reason || 'Highest overall fit'}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Strengths Comparison -->
-            <div style="background: rgba(76, 175, 80, 0.1); border-left: 3px solid #4CAF50; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                <h4 style="color: #4CAF50; margin-top: 0;">💪 Strengths Comparison</h4>
-                <p>${strengths}</p>
-            </div>
-
-            <!-- Weaknesses Comparison -->
-            <div style="background: rgba(244, 67, 54, 0.2); border-left: 3px solid #F44336; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                <h4 style="color: #F44336; margin-top: 0;">⚠️ Weaknesses Comparison</h4>
-                <p>${weaknesses}</p>
-            </div>
-
-            <!-- Skill Coverage Matrix -->
-            <div>
-                <h4>🎯 Skill Coverage Matrix</h4>
-                <table style="width: 100%; font-size: 0.85rem;">
-                    <thead>
-                        <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
-                            <th style="padding: 0.5rem; text-align: left;">Candidate</th>
-                            <th style="padding: 0.5rem; text-align: left;">Covered Skills</th>
-                            <th style="padding: 0.5rem; text-align: left;">Missing Skills</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        Object.entries(skillMatrix).forEach(([docId, skills]) => {
-            const covered = (skills.covered || []).slice(0, 3).join(', ');
-            const missing = (skills.missing || []).slice(0, 3).join(', ');
-            
-            html += `
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 0.5rem; font-weight: bold;">${docId}</td>
-                            <td style="padding: 0.5rem; color: #4CAF50;">✓ ${covered || 'N/A'}</td>
-                            <td style="padding: 0.5rem; color: #F44336;">✗ ${missing || 'N/A'}</td>
-                        </tr>
-            `;
-        });
-
-        html += `
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Hiring Recommendations -->
-            <div style="margin-top: 1.5rem;">
-                <h4>💼 Tailored Hiring Recommendations</h4>
-        `;
-
-        Object.entries(hiring).forEach(([docId, rec]) => {
-            html += `
-                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
-                    <strong>${docId}:</strong>
-                    <p style="margin-top: 0.5rem; font-size: 0.9rem;">${rec}</p>
-                </div>
-            `;
-        });
-
-        html += `
-            </div>
-        `;
-
-        compSection.innerHTML = html;
-        
-        // Initialize Lucide icons in the new section
-        try {
-            lucide.createIcons();
-        } catch (e) {
-            console.log("Lucide icons not available");
+    function updateStatus(text, color) {
+        const statusText = document.getElementById('status-text');
+        const statusIndicator = document.querySelector('.status-indicator');
+        if (statusText) statusText.textContent = text;
+        if (statusIndicator) {
+            statusIndicator.style.background = color;
+            statusIndicator.style.boxShadow = `0 0 8px ${color}`;
         }
     }
 
     function sortBatchResults(sortBy) {
-        if (!state.batchDocuments) return;
+        if (!state.batchDocuments || state.batchDocuments.length === 0) return;
 
         let sorted = [...state.batchDocuments];
 
@@ -689,565 +827,415 @@ document.addEventListener('DOMContentLoaded', function() {
             state.batchSortBy = 'name';
         }
 
-        renderComparisonView(sorted);
+        state.batchDocuments = sorted;
+        
+        // Re-render the comparison view with sorted data
+        const comparisonSection = document.getElementById('batch-comparison');
+        if (comparisonSection) {
+            let html = `
+                <div id="comparison-table-container">
+                    <h2>Batch Analysis Results</h2>
+            `;
+            html += renderComparisonViewHTML(sorted);
+            
+            if (state.comparativeAnalysis && sorted.length > 1) {
+                html += renderComparativeAnalysisHTML(state.comparativeAnalysis, sorted);
+            }
+            
+            html += `</div>`;
+            comparisonSection.innerHTML = html;
+        }
+
         addLog(`📊 Sorted by ${sortBy}`);
     }
-
-    function updateStatus(text, color) {
-        document.getElementById('status-text').textContent = text;
-        document.querySelector('.status-indicator').style.background = color;
-        document.querySelector('.status-indicator').style.boxShadow = `0 0 8px ${color}`;
+    
+    function getScoreColor(score) {
+        if (score >= 75) return '#4CAF50';  // Green
+        if (score >= 50) return '#FF9800';  // Orange
+        return '#F44336';  // Red
     }
-
-    // Rendering Logic
-    function renderResults() {
-        const data = state.extractedData;
-        
-        // Safely access nested properties
-        const resume = data.struct || {};
-        const contact = resume.contact || {};
-        const experience = resume.experience || [];
-        const skills = resume.skills || [];
-        const entities = data.nlp?.entities || {};
-        
-        // Extract name from persons entities if not in resume
-        let candidateName = resume.name || contact.name || "Unknown";
-        if (candidateName === "Unknown" && entities.persons && entities.persons.length > 0) {
-            // Check if first person is object or string
-            const firstPerson = entities.persons[0];
-            candidateName = (typeof firstPerson === 'object' && firstPerson.text) ? firstPerson.text : String(firstPerson);
-        }
-        
-        // Calculate total experience in years and months
-        let totalMonths = 0;
-        const today = new Date('2025-12-15');
-        
-        experience.forEach(exp => {
-            if (exp.start_date && exp.end_date) {
-                const start = new Date(exp.start_date);
-                const end = exp.end_date.toLowerCase() === 'present' ? today : new Date(exp.end_date);
-                const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-                totalMonths += Math.max(0, months);
-            }
+    
+    function renderComparisonViewHTML(documents) {
+        // Sort by score for ranking
+        const sorted = [...documents].sort((a, b) => {
+            const scoreA = a.analysis?.llm_analysis?.overall_score || 0;
+            const scoreB = b.analysis?.llm_analysis?.overall_score || 0;
+            return scoreB - scoreA;
         });
         
-        const years = Math.floor(totalMonths / 12);
-        const months = totalMonths % 12;
-        const experienceText = years > 0 || months > 0 
-            ? `${years} year${years !== 1 ? 's' : ''} ${months} month${months !== 1 ? 's' : ''}`
-            : '0 years';
-        
-        // Determine latest role
-        let latestRole = 'Beginner';
-        if (experience.length > 0 && experience[0]?.role) {
-            latestRole = experience[0].role;
-        } else if (experience.length === 0) {
-            latestRole = 'None';
-        }
-        
-        // Extract extra links (github, etc)
-        const extraLinks = [];
-        if (contact.linkedin) {
-            // Ensure proper URL format
-            const linkedinUrl = contact.linkedin.startsWith('http') ? contact.linkedin : `https://${contact.linkedin}`;
-            extraLinks.push(`<a href="${linkedinUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">LinkedIn</a>`);
-        }
-        if (contact.github) {
-            const githubUrl = contact.github.startsWith('http') ? contact.github : `https://${contact.github}`;
-            extraLinks.push(`<a href="${githubUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">GitHub</a>`);
-        }
-        if (contact.website) {
-            const websiteUrl = contact.website.startsWith('http') ? contact.website : `https://${contact.website}`;
-            extraLinks.push(`<a href="${websiteUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">Website</a>`);
-        }
-        if (contact.portfolio) {
-            const portfolioUrl = contact.portfolio.startsWith('http') ? contact.portfolio : `https://${contact.portfolio}`;
-            extraLinks.push(`<a href="${portfolioUrl}" target="_blank" style="color:var(--accent);margin-right:1rem">Portfolio</a>`);
-        }
-        
-        // Store candidate name globally for modal usage
-        window.candidateName = candidateName;
-        window.candidateEmail = contact.email || "";
-        
-        // 1. Summary Section - Add Accept/Refuse buttons
-        document.getElementById('profile-content').innerHTML = `
-            <p><strong>Name:</strong> ${candidateName}</p>
-            <p><strong>Email:</strong> ${contact.email || "N/A"}</p>
-            <p><strong>Phone:</strong> ${contact.phone || "N/A"}</p>
-            <div style="margin-top:0.5rem">
-                ${extraLinks.join('')}
-            </div>
-            <div style="margin-top:1.5rem;display:flex;gap:0.75rem;">
-                <button class="btn-accept" onclick="showAcceptanceModal()">✅ Accept</button>
-                <button class="btn-refuse" onclick="showRefusalModal()">❌ Refuse</button>
-            </div>
+        let html = `
+            <h3>PASS 1: Individual Candidate Analysis</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Candidate</th>
+                        <th>Seniority</th>
+                        <th>Overall Score</th>
+                        <th>Strengths</th>
+                        <th>Weaknesses</th>
+                        <th>Experience</th>
+                        <th>Fit Verdict</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
-        
-        document.getElementById('experience-summary').innerHTML = `
-            <p><strong>Years Exp:</strong> ${experienceText}</p>
-            <p><strong>Latest Role:</strong> ${latestRole}</p>
-            <p><strong>Latest Company:</strong> ${experience[0]?.company || "N/A"}</p>
-        `;
-        
-        // Analysis Context - Display Job Requirements Used
-        const contextEl = document.getElementById('analysis-context');
-        if (contextEl) {
-            let contextHTML = '<h3>Analysis Context</h3>';
-            
-            // Job Requirements Status
-            if (data.ml && data.ml.job_requirements_used !== undefined) {
-                const jobReqsUsed = data.ml.job_requirements_used;
-                const jobReqsHash = data.ml.job_requirements_hash || 'N/A';
-                
-                contextHTML += `
-                    <p><strong>Job Requirements Used:</strong> ${jobReqsUsed ? '✅ Yes' : '❌ No'}</p>
-                    <p><strong>Hash (Verification):</strong> <code style="font-size:0.85em;word-break:break-all;">${jobReqsHash}</code></p>
+
+        sorted.forEach((doc, index) => {
+            if (doc.status !== 'success') {
+                html += `
+                    <tr class="row-failed">
+                        <td>${index + 1}</td>
+                        <td>${doc.filename || 'Unknown'}</td>
+                        <td colspan="6"><span class="badge badge-failed">❌ ${doc.error || 'Processing failed'}</span></td>
+                    </tr>
                 `;
-                
-                if (data.ml.job_requirements_raw) {
-                    contextHTML += `
-                        <p><strong>Job Requirements Text:</strong></p>
-                        <div style="background:#f5f5f5;padding:0.75rem;border-radius:0.5rem;max-height:200px;overflow-y:auto;border-left:3px solid var(--accent);">
-                            ${data.ml.job_requirements_raw.split('\n').map(line => `<p style="margin:0.25rem 0;">${line}</p>`).join('')}
+                return;
+            }
+
+            const analysis = doc.llm_analysis || {};
+            const overallScore = analysis.overall_score || 0;
+            const seniority = analysis.seniority_level || doc.seniority_level || 'Unknown';
+            const strengths = analysis.strengths || [];
+            const weaknesses = analysis.weaknesses || [];
+            const yearsExp = analysis.key_metrics?.years_experience || doc.years_experience || 0;
+            const verdict = analysis.role_fit_verdict?.recommendation || 'Not assessed';
+
+            // Color code score
+            const scoreColor = overallScore >= 75 ? '#4CAF50' : overallScore >= 50 ? '#FF9800' : '#F44336';
+
+            html += `
+                <tr class="row-success">
+                    <td style="font-size: 1.2em; font-weight: bold; color: var(--accent);">#${index + 1}</td>
+                    <td>
+                        <strong style="color: var(--text-primary);">${analysis.candidate_name || doc.name || doc.filename || 'Resume'}</strong>
+                        <br><small style="color: var(--text-secondary);">ID: ${doc.document_id}</small>
+                    </td>
+                    <td style="color: var(--text-primary);">${seniority}</td>
+                    <td>
+                        <div style="font-size: 18px; font-weight: bold; color: ${scoreColor};">
+                            ${overallScore}/100
                         </div>
-                    `;
-                }
-            }
-            
-            contextEl.innerHTML = contextHTML;
-        }
-        
-        // AI Summary (from markdown) - Make it more detailed
-        const aiSummaryEl = document.getElementById('ai-summary');
-        if (data.ml && Object.keys(data.ml).length > 0) {
-            // Build comprehensive assessment from LLM data
-            let assessmentHTML = '<h1>AI Executive Assessment</h1>';
-            
-            // Executive Summary
-            if (data.ml.executive_summary) {
-                assessmentHTML += `<h2>Executive Summary</h2><p>${data.ml.executive_summary}</p>`;
-            }
-            
-            // Seniority and Recommended Roles
-            if (data.ml.seniority_level || data.ml.recommended_roles) {
-                assessmentHTML += '<h2>Professional Profile</h2>';
-                if (data.ml.seniority_level) {
-                    assessmentHTML += `<p><strong>Seniority Level:</strong> ${data.ml.seniority_level}</p>`;
-                }
-                
-                // Display detailed role recommendations with icons
-                if (data.ml.recommended_roles && Array.isArray(data.ml.recommended_roles)) {
-                    assessmentHTML += '<h3>Recommended Roles</h3>';
-                    
-                    // Check if roles are detailed objects or simple strings
-                    const firstRole = data.ml.recommended_roles[0];
-                    if (firstRole && typeof firstRole === 'object' && firstRole.title) {
-                        // Detailed role objects with icons
-                        assessmentHTML += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:1rem">';
-                        
-                        data.ml.recommended_roles.forEach(role => {
-                            const icon = role.icon || '💼';
-                            const title = role.title || 'Unknown Role';
-                            const explanation = role.explanation || 'No explanation provided';
-                            const fitScore = role.fit_score || 0;
-                            
-                            // Color code based on fit score
-                            let scoreColor = '#ff6b6b';
-                            if (fitScore >= 75) scoreColor = '#51cf66';
-                            else if (fitScore >= 50) scoreColor = '#ffd43b';
-                            
-                            assessmentHTML += `
-                                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:1rem;transition:transform 0.2s,box-shadow 0.2s">
-                                    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem">
-                                        <span style="font-size:2rem">${icon}</span>
-                                        <div>
-                                            <h4 style="margin:0;color:var(--text-primary);font-size:1rem">${title}</h4>
-                                            <span style="color:${scoreColor};font-weight:bold;font-size:0.9rem">${fitScore}% Match</span>
-                                        </div>
-                                    </div>
-                                    <p style="margin:0.5rem 0 0 0;color:var(--text-secondary);font-size:0.9rem;line-height:1.5">${explanation}</p>
-                                </div>
-                            `;
-                        });
-                        
-                        assessmentHTML += '</div>';
-                    } else {
-                        // Fallback: simple role strings
-                        assessmentHTML += `<p><strong>Recommended Roles:</strong> ${data.ml.recommended_roles.join(', ')}</p>`;
-                    }
-                }
-            }
-            
-            // Technical and Cultural Fit
-            if (data.ml.technical_fit || data.ml.cultural_fit) {
-                assessmentHTML += '<h2>Fit Analysis</h2>';
-                if (data.ml.technical_fit) {
-                    const techScore = data.ml.technical_fit.score || 0;
-                    const techExplanation = data.ml.technical_fit.explanation || '';
-                    assessmentHTML += `<p><strong>Technical Fit:</strong> ${techScore}/100 - ${techExplanation}</p>`;
-                }
-                if (data.ml.cultural_fit) {
-                    const cultScore = data.ml.cultural_fit.score || 0;
-                    const cultExplanation = data.ml.cultural_fit.explanation || '';
-                    assessmentHTML += `<p><strong>Cultural Fit:</strong> ${cultScore}/100 - ${cultExplanation}</p>`;
-                }
-            }
-            
-            // Key Achievements
-            if (data.ml.key_achievements && Array.isArray(data.ml.key_achievements)) {
-                assessmentHTML += '<h2>Key Achievements</h2><ul>';
-                data.ml.key_achievements.forEach(achievement => {
-                    // Filter out empty or invalid achievements
-                    if (achievement && achievement.trim() !== '' && achievement !== 'Position not extracted') {
-                        assessmentHTML += `<li>${achievement}</li>`;
-                    }
-                });
-                assessmentHTML += '</ul>';
-            }
-            
-            // Key Metrics
-            if (data.ml.key_metrics) {
-                assessmentHTML += '<h2>Key Metrics</h2><ul>';
-                Object.entries(data.ml.key_metrics).forEach(([key, value]) => {
-                    const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    // Format value properly - handle objects
-                    let formattedValue = value;
-                    if (key === 'skill_categories' && typeof value === 'object') {
-                        // Format skill categories as readable string
-                        formattedValue = Object.entries(value)
-                            .map(([cat, count]) => `${cat.replace(/_/g, ' ')}: ${count}`)
-                            .join(', ');
-                    }
-                    assessmentHTML += `<li><strong>${formattedKey}:</strong> ${formattedValue}</li>`;
-                });
-                assessmentHTML += '</ul>';
-            }
-            
-            aiSummaryEl.innerHTML = assessmentHTML;
-        } else if (data.report.html || data.upload.resume_markdown) {
-            aiSummaryEl.innerHTML = data.report.html || data.upload.resume_markdown;
-        } else if (resume.summary) {
-            aiSummaryEl.innerHTML = resume.summary;
-        } else {
-            aiSummaryEl.innerHTML = "<p>No summary available</p>";
-        }
-
-        // 2. Skills - handle both string array and object array
-        const skillsContainer = document.getElementById('skills-cloud');
-        skillsContainer.innerHTML = '';
-        
-        // Extract skill names from objects or use strings directly
-        const skillNames = skills.map(skill => {
-            if (typeof skill === 'string') return skill;
-            if (typeof skill === 'object' && skill !== null) {
-                return skill.name || skill.skill || skill.text || JSON.stringify(skill);
-            }
-            return String(skill);
+                    </td>
+                    <td>
+                        <div style="max-width: 200px;">
+                            ${strengths.length > 0 ? strengths.slice(0, 3).map(s => `<span class="skill-tag matched">${s}</span>`).join('') : '<em style="color: var(--text-secondary);">None</em>'}
+                        </div>
+                    </td>
+                    <td>
+                        <div style="max-width: 200px;">
+                            ${weaknesses.length > 0 ? weaknesses.slice(0, 3).map(s => `<span class="skill-tag missing">${s}</span>`).join('') : '<em style="color: var(--text-secondary);">None</em>'}
+                        </div>
+                    </td>
+                    <td style="color: var(--text-primary);">${yearsExp} years</td>
+                    <td><span class="badge" style="background: ${verdict === 'YES' ? '#4CAF50' : verdict === 'MAYBE' ? '#FF9800' : '#F44336'}; color: white;">${verdict}</span></td>
+                </tr>
+            `;
         });
+
+        html += `
+                </tbody>
+            </table>
+        `;
         
-        const uniqueSkills = [...new Set(skillNames)];
-        if (uniqueSkills.length > 0) {
-            uniqueSkills.forEach(skillName => {
-                const span = document.createElement('span');
-                span.className = 'skill-tag';
-                span.textContent = skillName;
-                skillsContainer.appendChild(span);
-            });
-        } else {
-            skillsContainer.innerHTML = '<p>No skills detected</p>';
-        }
+        return html;
+    }
+    
+    function renderComparativeAnalysisHTML(comparativeData, documents) {
+        let html = `<h3 style="margin-top: 2rem;">PASS 2: Comparative Analysis (AI Executive Assessment)</h3>`;
         
-        // NER Table - handle certifications
-        const tbody = document.querySelector('#entities-table tbody');
-        if (tbody) {
-            tbody.innerHTML = '';
-            const certs = resume.certifications || [];
-            if (certs.length > 0) {
-                certs.forEach(cert => {
-                    // Handle both string and object formats
-                    let certName = '';
-                    if (typeof cert === 'string') {
-                        certName = cert;
-                    } else if (typeof cert === 'object' && cert !== null) {
-                        certName = cert.name || cert.certification || cert.title || JSON.stringify(cert);
-                    } else {
-                        certName = String(cert);
-                    }
-                    addRow(tbody, certName, "CERT", "High");
-                });
-            } else {
-                const row = tbody.insertRow();
-                row.innerHTML = '<td colspan="3">No certifications found</td>';
-            }
-        }
-        
-        // 3. AI Score
-        const mlData = data.ml || {};
-        const score = mlData.overall_score || mlData.ai_score || mlData.predicted_ai_score || 0;
-        const scoreElement = document.getElementById('ai-score-circle');
-        if (scoreElement) {
-            scoreElement.textContent = Math.round(score);
-        }
-        
-        // Factors/Summary - Expanded with positive and negative factors in separate divs
-        const factorsList = document.getElementById('ml-factors-list');
-        if (factorsList) {
-            factorsList.innerHTML = '';
-            
-            // Positive Factors Section
-            const positiveDiv = document.createElement('div');
-            positiveDiv.style.marginBottom = '1rem';
-            
-            const positiveTitle = document.createElement('h4');
-            positiveTitle.textContent = 'Strengths & Positive Factors';
-            positiveTitle.style.color = 'var(--success)';
-            positiveTitle.style.marginBottom = '0.5rem';
-            positiveDiv.appendChild(positiveTitle);
-            
-            // Show strengths from LLM analysis
-            if (mlData.strengths && Array.isArray(mlData.strengths)) {
-                mlData.strengths.forEach(strength => {
-                    const li = document.createElement('li');
-                    li.textContent = `✓ ${strength}`;
-                    li.style.color = "var(--success)";
-                    positiveDiv.appendChild(li);
-                });
-            }
-            
-            // Show opportunities
-            if (mlData.opportunities && Array.isArray(mlData.opportunities)) {
-                mlData.opportunities.forEach(opportunity => {
-                    const li = document.createElement('li');
-                    li.textContent = `⭐ ${opportunity}`;
-                    li.style.color = "var(--accent)";
-                    positiveDiv.appendChild(li);
-                });
-            }
-            
-            factorsList.appendChild(positiveDiv);
-            
-            // Negative Factors Section
-            const negativeDiv = document.createElement('div');
-            negativeDiv.style.marginTop = '1rem';
-            
-            const negativeTitle = document.createElement('h4');
-            negativeTitle.textContent = 'Weaknesses & Areas for Improvement';
-            negativeTitle.style.color = 'var(--error)';
-            negativeTitle.style.marginBottom = '0.5rem';
-            negativeDiv.appendChild(negativeTitle);
-            
-            // Show weaknesses
-            if (mlData.weaknesses && Array.isArray(mlData.weaknesses)) {
-                mlData.weaknesses.forEach(weakness => {
-                    const li = document.createElement('li');
-                    li.textContent = `✗ ${weakness}`;
-                    li.style.color = "var(--error)";
-                    negativeDiv.appendChild(li);
-                });
-            }
-            
-            // Show missing skills
-            if (mlData.missing_skills && Array.isArray(mlData.missing_skills)) {
-                mlData.missing_skills.forEach(skill => {
-                    const li = document.createElement('li');
-                    li.textContent = `⚠ Missing: ${skill}`;
-                    li.style.color = "rgba(239, 69, 101, 0.8)";
-                    negativeDiv.appendChild(li);
-                });
-            }
-            
-            factorsList.appendChild(negativeDiv);
-            
-            // Fallback to summary if no factors
-            if (positiveDiv.children.length === 1 && negativeDiv.children.length === 1) {
-                factorsList.innerHTML = '';
-                const summary = mlData.summary || mlData.ai_summary || "Analysis complete";
-                if (typeof summary === 'string') {
-                    const li = document.createElement('li');
-                    li.textContent = summary;
-                    li.style.color = "var(--success)";
-                    factorsList.appendChild(li);
-                } else if (Array.isArray(summary)) {
-                    summary.forEach(item => {
-                        const li = document.createElement('li');
-                        li.textContent = item;
-                        li.style.color = "var(--success)";
-                        factorsList.appendChild(li);
-                    });
-                }
-            }
+        // Executive Summary
+        const executive = comparativeData.executive_summary || '';
+        if (executive) {
+            html += `
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 1.5rem;">
+                    <h4 style="margin-top: 0;">Executive Summary</h4>
+                    <p>${executive}</p>
+                </div>
+            `;
         }
 
-        // 4. JSON
-        const jsonDisplay = document.getElementById('json-display');
-        if (jsonDisplay) {
-            jsonDisplay.textContent = JSON.stringify(resume, null, 2);
-        }
-
-        // 5. Job Fit Analysis (if available)
-        const jobFitSection = document.getElementById('job-fit-section');
-        if (jobFitSection && mlData.gap_analysis) {
-            jobFitSection.style.display = 'block';
+        // Comparative Ranking
+        const ranking = comparativeData.comparative_ranking || [];
+        if (ranking.length > 0) {
+            html += `
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <h4>Candidate Rankings</h4>
+                    <table class="comparison-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Candidate</th>
+                                <th>Normalized Fit Score</th>
+                                <th>Rationale</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
             
-            // Hire recommendation
-            const recommendation = mlData.hire_recommendation || "NO";
-            const recElement = document.getElementById('job-hire-recommendation');
-            if (recElement) {
-                recElement.textContent = recommendation;
-                recElement.style.color = recommendation === "YES" ? "var(--success)" : 
-                                        recommendation === "MAYBE" ? "var(--accent)" : "var(--error)";
-            }
-            
-            // Match ratio
-            const matchRatio = mlData.gap_analysis.skills_match_ratio || 0;
-            const matchElement = document.getElementById('job-match-ratio');
-            if (matchElement) {
-                matchElement.textContent = `${matchRatio}% skill match (${mlData.gap_analysis.matched_skills?.length || 0}/${mlData.gap_analysis.required_skills?.length || 0})`;
-            }
-            
-            // Skills summary
-            const skillsSummaryElement = document.getElementById('job-skills-summary');
-            if (skillsSummaryElement) {
-                const analysis = mlData.gap_analysis.analysis || "";
-                skillsSummaryElement.innerHTML = `
-                    <p>${analysis}</p>
-                    <p style="margin-top: 0.5rem; color: var(--text-secondary);">
-                        Seniority Required: ${mlData.gap_analysis.role_seniority}<br/>
-                        Experience Required: ${mlData.gap_analysis.required_experience}
-                    </p>
+            ranking.forEach(item => {
+                const doc = documents.find(d => d.document_id === item.document_id);
+                const name = doc?.filename || doc?.document_id || 'Unknown';
+                const score = item.normalized_fit_score || 0;
+                const scoreColor = score >= 75 ? '#4CAF50' : score >= 50 ? '#FF9800' : '#F44336';
+                
+                html += `
+                    <tr>
+                        <td style="font-weight: bold; font-size: 1.2rem; color: #667eea;">${item.rank || '-'}</td>
+                        <td><strong>${name}</strong></td>
+                        <td>
+                            <div style="font-size: 1.1rem; font-weight: bold; color: ${scoreColor};">
+                                ${score}/100
+                            </div>
+                        </td>
+                        <td>${item.rationale || '-'}</td>
+                    </tr>
                 `;
-            }
+            });
             
-            // Missing skills
-            const missingSkillsElement = document.getElementById('job-missing-skills');
-            if (missingSkillsElement) {
-                missingSkillsElement.innerHTML = '';
-                const missing = mlData.gap_analysis.missing_skills || [];
-                if (missing.length > 0) {
-                    missing.forEach(skill => {
-                        const span = document.createElement('span');
-                        span.className = 'skill-tag';
-                        span.style.backgroundColor = 'rgba(239, 69, 101, 0.2)';
-                        span.style.color = 'var(--error)';
-                        span.textContent = '✗ ' + skill;
-                        missingSkillsElement.appendChild(span);
-                    });
-                } else {
-                    missingSkillsElement.innerHTML = '<p style="color: var(--success);">All required skills matched!</p>';
-                }
-            }
-            
-            // Matched skills
-            const matchedSkillsElement = document.getElementById('job-matched-skills');
-            if (matchedSkillsElement) {
-                matchedSkillsElement.innerHTML = '';
-                const matched = mlData.gap_analysis.matched_skills || [];
-                if (matched.length > 0) {
-                    matched.forEach(skill => {
-                        const span = document.createElement('span');
-                        span.className = 'skill-tag';
-                        span.style.backgroundColor = 'rgba(61, 169, 250, 0.2)';
-                        span.style.color = 'var(--success)';
-                        span.textContent = '✓ ' + skill;
-                        matchedSkillsElement.appendChild(span);
-                    });
-                }
-            }
-        } else if (jobFitSection) {
-            jobFitSection.style.display = 'none';
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
         }
 
-        // 6. Recommended Roles (below h3 in main layout)
-        const rolesListEl = document.getElementById('roles-list');
-        if (rolesListEl) {
-            rolesListEl.innerHTML = '';
+        // Candidate Profiles
+        html += `<h4 style="margin-top: 2rem;">Candidate Profiles</h4>`;
+        documents.forEach(doc => {
+            if (doc.status !== 'success') return;
+            
+            const analysis = doc.analysis?.llm_analysis || {};
+            const name = doc.filename || 'Unknown';
+            const rank = ranking.find(r => r.document_id === doc.document_id)?.rank || '-';
+            
+            html += `
+                <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #667eea;">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <h5 style="margin: 0 0 0.5rem 0;">${name}</h5>
+                            <p style="margin: 0; color: #666;">
+                                <strong>Rank:</strong> #${rank} | 
+                                <strong>Seniority:</strong> ${analysis.seniority_level || 'Not assessed'}
+                            </p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 2rem; font-weight: bold; color: ${analysis.overall_score >= 75 ? '#4CAF50' : '#FF9800'};">
+                                ${analysis.overall_score || 0}/100
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #f9f9f9; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                        <strong>Profile Summary:</strong><br>
+                        <p style="margin: 0.5rem 0 0 0; line-height: 1.5;">
+                            ${analysis.executive_summary || 'No summary available'}
+                        </p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <strong>Strengths:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${(analysis.strengths || []).length > 0 
+                                    ? analysis.strengths.map(s => `<span class="skill-tag matched">${s}</span>`).join('')
+                                    : '<em style="color: #999;">None listed</em>'
+                                }
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Weaknesses:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${(analysis.weaknesses || []).length > 0 
+                                    ? analysis.weaknesses.map(w => `<span class="skill-tag missing">${w}</span>`).join('')
+                                    : '<em style="color: #999;">None listed</em>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <strong>Critical Gaps:</strong>
+                        <div style="margin-top: 0.5rem;">
+                            ${(analysis.critical_gaps || []).length > 0 
+                                ? analysis.critical_gaps.map(g => `<span class="skill-tag missing">⚠ ${g}</span>`).join('')
+                                : '<em style="color: #999;">None identified</em>'
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
 
-            if (mlData.recommended_roles && Array.isArray(mlData.recommended_roles)) {
-                const roles = mlData.recommended_roles.slice(0, 20);
-                const firstRole = roles[0];
+        // Experience Summary
+        html += `<h4 style="margin-top: 2rem;">Experience Analysis</h4>`;
+        documents.forEach(doc => {
+            if (doc.status !== 'success') return;
+            
+            const analysis = doc.analysis?.llm_analysis || {};
+            const name = doc.filename || 'Unknown';
+            
+            html += `
+                <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #764ba2;">
+                    <h5 style="margin: 0 0 1rem 0;">${name}</h5>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <div>
+                            <strong>Experience Assessment:</strong><br>
+                            <p style="margin: 0.5rem 0 0 0; line-height: 1.5;">
+                                ${analysis.experience_assessment || 'Not assessed'}
+                            </p>
+                        </div>
+                        <div>
+                            <strong>Role Fit Verdict:</strong><br>
+                            <p style="margin: 0.5rem 0 0 0; line-height: 1.5;">
+                                <strong>${analysis.role_fit_verdict?.recommendation || 'Pending'}</strong><br>
+                                <small>${analysis.role_fit_verdict?.rationale || ''}</small>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    ${analysis.recommended_roles && analysis.recommended_roles.length > 0 ? `
+                        <div style="margin-top: 1rem;">
+                            <strong>Recommended Roles:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${analysis.recommended_roles.map(r => `<span class="badge badge-success">${r}</span>`).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
 
-                if (firstRole && typeof firstRole === 'object' && firstRole.title) {
-                    // Detailed role objects with icon/explanation/fit_score
-                    rolesListEl.style.display = 'grid';
-                    rolesListEl.style.gridTemplateColumns = 'repeat(auto-fill, minmax(260px, 1fr))';
-                    rolesListEl.style.gap = '1rem';
-
-                    roles.forEach(role => {
-                        const icon = role.icon || '💼';
-                        const title = role.title || 'Role';
-                        const explanation = role.explanation || 'No explanation provided';
-                        const fitScore = role.fit_score ?? role.score ?? 0;
-
-                        let scoreColor = '#ff6b6b';
-                        if (fitScore >= 75) scoreColor = '#51cf66';
-                        else if (fitScore >= 50) scoreColor = '#ffd43b';
-
-                        const card = document.createElement('div');
-                        card.style.background = 'var(--bg-card)';
-                        card.style.border = '1px solid var(--border)';
-                        card.style.borderRadius = '8px';
-                        card.style.padding = '0.9rem';
-                        card.style.display = 'flex';
-                        card.style.flexDirection = 'column';
-                        card.style.gap = '0.35rem';
-
-                        card.innerHTML = `
-                            <div style="display:flex;align-items:center;gap:0.65rem;">
-                                <span style="font-size:1.8rem;line-height:1;">${icon}</span>
-                                <div>
-                                    <div style="font-weight:700;color:var(--text-primary);">${title}</div>
-                                    <div style="color:${scoreColor};font-weight:600;font-size:0.9rem;">${Math.round(fitScore)}% match</div>
+        // Skill Coverage Matrix
+        const skillMatrix = comparativeData.skill_coverage_matrix || {};
+        if (Object.keys(skillMatrix).length > 0) {
+            html += `
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <h4>Skill Coverage Matrix</h4>
+            `;
+            
+            Object.entries(skillMatrix).forEach(([docId, skills]) => {
+                const doc = documents.find(d => d.document_id === docId);
+                const name = doc?.filename || docId;
+                
+                html += `
+                    <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eee;">
+                        <strong>${name}</strong>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 0.5rem;">
+                            <div>
+                                <em style="color: #666;">Covered Skills:</em>
+                                <div style="margin-top: 0.3rem;">
+                                    ${(skills.covered || []).length > 0 
+                                        ? skills.covered.map(s => `<span class="skill-tag matched">${s}</span>`).join('')
+                                        : '<span style="color: #999;">None</span>'
+                                    }
                                 </div>
                             </div>
-                            <div style="color:var(--text-secondary);font-size:0.9rem;line-height:1.4;">${explanation}</div>
-                        `;
+                            <div>
+                                <em style="color: #666;">Missing Skills:</em>
+                                <div style="margin-top: 0.3rem;">
+                                    ${(skills.missing || []).length > 0 
+                                        ? skills.missing.map(s => `<span class="skill-tag missing">${s}</span>`).join('')
+                                        : '<span style="color: #999;">All covered</span>'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+        }
 
-                        rolesListEl.appendChild(card);
-                    });
-                } else {
-                    // Simple strings fallback
-                    rolesListEl.style.display = 'flex';
-                    rolesListEl.style.flexWrap = 'wrap';
-                    rolesListEl.style.gap = '0.5rem';
-
-                    roles.forEach(role => {
-                        const tag = document.createElement('span');
-                        tag.className = 'skill-tag';
-                        tag.textContent = role;
-                        rolesListEl.appendChild(tag);
-                    });
-                }
-            } else {
-                rolesListEl.innerHTML = '<p style="color:var(--text-secondary);margin:0;">No recommended roles available.</p>';
+        // Strengths & Weaknesses Comparison
+        const strengthsComp = comparativeData.strengths_comparison || '';
+        const weaknessesComp = comparativeData.weaknesses_comparison || '';
+        
+        if (strengthsComp || weaknessesComp) {
+            html += `<h4 style="margin-top: 2rem;">Cross-Candidate Comparison</h4>`;
+            
+            if (strengthsComp) {
+                html += `
+                    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #4CAF50;">
+                        <strong style="color: #4CAF50;">Strengths Comparison:</strong>
+                        <p style="margin: 0.5rem 0 0 0;">${strengthsComp}</p>
+                    </div>
+                `;
+            }
+            
+            if (weaknessesComp) {
+                html += `
+                    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #F44336;">
+                        <strong style="color: #F44336;">Weaknesses Comparison:</strong>
+                        <p style="margin: 0.5rem 0 0 0;">${weaknessesComp}</p>
+                    </div>
+                `;
             }
         }
+
+        // Hiring Recommendations
+        const recommendations = comparativeData.hiring_recommendations || {};
+        if (Object.keys(recommendations).length > 0) {
+            html += `
+                <div class="card" style="margin-bottom: 1.5rem; background: #f0f7ff; border-left: 4px solid #2196F3;">
+                    <h4 style="margin-top: 0; color: #2196F3;">💼 Hiring Recommendations</h4>
+            `;
+            
+            Object.entries(recommendations).forEach(([docId, recommendation]) => {
+                const doc = documents.find(d => d.document_id === docId);
+                const name = doc?.filename || docId;
+                
+                html += `
+                    <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e0e0e0;">
+                        <strong>${name}:</strong><br>
+                        <p style="margin: 0.5rem 0 0 0; line-height: 1.6;">${recommendation}</p>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+        }
+
+        return html;
     }
 
-    function addRow(tbody, cell1, cell2, cell3) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${cell1}</td><td>${cell2}</td><td>${cell3}</td>`;
-        tbody.appendChild(tr);
+    // Handle clear job requirements button
+    if (clearJobReqBtn) {
+        clearJobReqBtn.addEventListener('click', () => {
+            state.jobRequirements = null;
+            jobReqInput.value = '';
+            jobReqStatus.textContent = 'No job requirements provided';
+            clearJobReqBtn.style.display = 'none';
+        });
     }
-
-}); // End DOMContentLoaded
+});
 
 // Global Modal Functions (outside DOMContentLoaded for onclick accessibility)
 function showAcceptanceModal() {
     const modal = document.getElementById('acceptance-modal');
     const nameSpan = document.getElementById('accept-candidate-name');
-    nameSpan.textContent = window.candidateName || 'Candidate';
-    modal.style.display = 'flex';
+    if (modal && nameSpan) {
+        nameSpan.textContent = window.candidateName || 'Candidate';
+        modal.style.display = 'flex';
+    }
 }
 
 function showRefusalModal() {
     const modal = document.getElementById('refusal-modal');
     const nameSpan = document.getElementById('refuse-candidate-name');
-    nameSpan.textContent = window.candidateName || 'Candidate';
-    modal.style.display = 'flex';
+    if (modal && nameSpan) {
+        nameSpan.textContent = window.candidateName || 'Candidate';
+        modal.style.display = 'flex';
+    }
 }
 
 function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 function continueAcceptance() {
@@ -1303,365 +1291,3 @@ function emailRefusal() {
     window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
     closeModal('refusal-modal');
 }
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-    }
-}
-
-function renderComparativeAnalysisHTML(comparativeData, documents) {
-    // Only render if we have actual comparative data
-    if (!comparativeData || !comparativeData.comparative_ranking || comparativeData.comparative_ranking.length === 0) {
-        return '';
-    }
-    
-    const ranking = comparativeData.comparative_ranking || [];
-    const strengths = comparativeData.strengths_comparison || '';
-    const weaknesses = comparativeData.weaknesses_comparison || '';
-    const skillMatrix = comparativeData.skill_coverage_matrix || {};
-    const strongest = comparativeData.strongest_candidate || {};
-    const hiring = comparativeData.hiring_recommendations || {};
-    const executive = comparativeData.executive_summary || '';
-
-    // New comprehensive fields
-    const candidateProfiles = comparativeData.candidate_profiles || [];
-    const experienceSummaries = comparativeData.experience_summaries || [];
-    const skillsAndEntities = comparativeData.skills_and_entities || [];
-    const aiFitScores = comparativeData.ai_fit_scores || [];
-    const evaluationFactors = comparativeData.evaluation_factors || [];
-    const recommendedRoles = comparativeData.recommended_roles || [];
-
-    let html = `
-        <h3 style="margin-top: 2rem;"><i data-lucide="trending-up"></i> PASS 2: Cross-Candidate Comparative Analysis</h3>
-        
-        <div style="background: rgba(61, 169, 250, 0.1); border-left: 3px solid #3da9fa; padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-            <strong>AI Executive Summary:</strong>
-            <p>${executive}</p>
-        </div>
-
-        <!-- Candidate Profiles -->
-        <div style="margin: 2rem 0;">
-            <h4>👥 Candidate Profiles (AI-Generated Comparative)</h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-    `;
-    
-    candidateProfiles.forEach(profile => {
-        const docId = profile.document_id || 'Unknown';
-        const name = profile.name || 'Unknown';
-        const summary = profile.summary || 'No summary available';
-        const seniority = profile.seniority_level || 'mid';
-        const yearsExp = profile.years_experience || 0;
-        const compared = profile.compared_to_others || '';
-        
-        html += `
-                <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid var(--accent);">
-                    <strong style="color: var(--accent);">${name}</strong>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0;">
-                        ${seniority} | ${yearsExp} years experience
-                    </p>
-                    <p style="font-size: 0.9rem; margin-top: 0.5rem;">${summary}</p>
-                    ${compared ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic;">
-                        📊 ${compared}
-                    </p>` : ''}
-                </div>
-        `;
-    });
-    
-    html += `
-            </div>
-        </div>
-
-        <!-- Experience Summaries -->
-        <div style="margin: 2rem 0;">
-            <h4>💼 Experience Analysis (Comparative)</h4>
-    `;
-    
-    experienceSummaries.forEach(expSum => {
-        const docId = expSum.document_id || 'Unknown';
-        const candidate = documents.find(d => d.document_id === docId);
-        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-        const expQuality = expSum.experience_quality || 'Not assessed';
-        const keyPositions = expSum.key_positions || [];
-        const compStrength = expSum.comparative_strength || '';
-        
-        html += `
-                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
-                    <strong>${name}</strong>
-                    <p style="margin: 0.5rem 0;">${expQuality}</p>
-                    ${keyPositions.length > 0 ? `<p style="font-size: 0.9rem; color: var(--text-secondary);">
-                        <strong>Key Roles:</strong> ${keyPositions.join(', ')}
-                    </p>` : ''}
-                    ${compStrength ? `<p style="font-size: 0.9rem; color: var(--accent); margin-top: 0.5rem; font-style: italic;">
-                        📊 ${compStrength}
-                    </p>` : ''}
-                </div>
-        `;
-    });
-    
-    html += `
-        </div>
-
-        <!-- Skills & Entities (Certificates, Skills) -->
-        <div style="margin: 2rem 0;">
-            <h4>🎯 Skills & Entities Comparison</h4>
-    `;
-    
-    skillsAndEntities.forEach(skillData => {
-        const docId = skillData.document_id || 'Unknown';
-        const candidate = documents.find(d => d.document_id === docId);
-        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-        const techSkills = skillData.technical_skills || [];
-        const softSkills = skillData.soft_skills || [];
-        const certs = skillData.certifications || [];
-        const uniqueSkills = skillData.unique_skills || [];
-        const gaps = skillData.skill_gaps || [];
-        
-        html += `
-                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem;">
-                    <strong style="color: var(--accent);">${name}</strong>
-                    
-                    ${techSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong>Technical Skills:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${techSkills.map(skill => `<span class="skill-tag matched">${skill}</span>`).join(' ')}
-                        </div>
-                    </div>` : ''}
-                    
-                    ${softSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong>Soft Skills:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${softSkills.map(skill => `<span class="skill-tag" style="background: rgba(61, 169, 250, 0.2);">${skill}</span>`).join(' ')}
-                        </div>
-                    </div>` : ''}
-                    
-                    ${certs.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong>Certifications:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${certs.map(cert => `<span class="badge badge-success">📜 ${cert}</span>`).join(' ')}
-                        </div>
-                    </div>` : ''}
-                    
-                    ${uniqueSkills.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong>Unique Skills (vs others):</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${uniqueSkills.map(skill => `<span class="skill-tag" style="background: rgba(255, 193, 7, 0.2); border-color: #ffc107;">⭐ ${skill}</span>`).join(' ')}
-                        </div>
-                    </div>` : ''}
-                    
-                    ${gaps.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong>Skill Gaps (vs others):</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${gaps.map(gap => `<span class="skill-tag missing">⚠ ${gap}</span>`).join(' ')}
-                        </div>
-                    </div>` : ''}
-                </div>
-        `;
-    });
-    
-    html += `
-        </div>
-
-        <!-- AI Fit Scores & Evaluation Factors -->
-        <div style="margin: 2rem 0;">
-            <h4>📊 AI Fit Scores & Evaluation Factors</h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1rem;">
-    `;
-    
-    aiFitScores.forEach(scoreData => {
-        const docId = scoreData.document_id || 'Unknown';
-        const candidate = documents.find(d => d.document_id === docId);
-        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-        const overallScore = scoreData.overall_fit_score || 0;
-        const comparedToGroup = scoreData.compared_to_group || 'average';
-        const scoreBreakdown = scoreData.score_breakdown || {};
-        const whyScore = scoreData.why_this_score || 'No explanation provided';
-        
-        // Find evaluation factors for this candidate
-        const evalFactor = evaluationFactors.find(ef => ef.document_id === docId) || {};
-        const strengths = evalFactor.strengths || [];
-        const weaknesses = evalFactor.weaknesses || [];
-        const opportunities = evalFactor.opportunities || [];
-        const compAdvantages = evalFactor.comparative_advantages || [];
-        const compDisadvantages = evalFactor.comparative_disadvantages || [];
-        
-        const scoreColor = getScoreColor(overallScore);
-        
-        html += `
-                <div class="card" style="background: var(--bg-card); padding: 1rem; border-left: 3px solid ${scoreColor};">
-                    <strong style="color: ${scoreColor};">${name}</strong>
-                    <div style="font-size: 2rem; font-weight: bold; color: ${scoreColor}; margin: 0.5rem 0;">
-                        ${overallScore}/100
-                    </div>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
-                        <strong>vs Group:</strong> ${metaphor_the_group}
-                    </p>
-                    
-                    ${Object.keys(scorebreakdown).length > 0 ? `<div style="margin-top: 1rem; font-size: 0.85rem;">
-                        <strong>Score Breakdown:</strong>
-                        <div style="margin-top: 0.5rem;">
-                            ${Object.entries(scorebreakdown).map(([key, value]) => 
-                                `<div style="display: flex; justify-content: space-between; margin: 0.25rem 0;">
-                                    <span>${key.replace(/_/g, ' ')}:</span>
-                                    <span style="font-weight: bold;">${value}/100</span>
-                                </div>`
-                            ).join('')}
-                        </div>
-                    </div>` : ''}
-                    
-                    <p style="font-size: 0.9rem; margin-top: 1rem; font-style: italic;">
-                        ${whyScore}
-                    </p>
-                    
-                    ${strengths.length > 0 ? `<div style="margin-top: 1rem;">
-                        <strong style="color: #4CAF50;">Strengths:</strong>
-                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                            ${strengths.map(s => `<li>${s}</li>`).join('')}
-                        </ul>
-                    </div>` : ''}
-                    
-                    ${weaknesses.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong style="color: #F44336;">Weaknesses:</strong>
-                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                            ${weaknesses.map(w => `<li>${w}</li>`).join('')}
-                        </ul>
-                    </div>` : ''}
-                    
-                    ${compAdvantages.length > 0 ? `<div style="margin-top: 0.75rem;">
-                        <strong style="color: var(--accent);">Comparative Advantages:</strong>
-                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem; font-size: 0.85rem;">
-                            ${compAdvantages.map(ca => `<li>⭐ ${ca}</li>`).join('')}
-                        </ul>
-                    </div>` : ''}
-                </div>
-        `;
-    });
-    
-    html += `
-            </div>
-        </div>
-
-        <!-- Recommended Roles (AI-Generated, Minimum 5 per candidate) -->
-        <div style="margin: 2rem 0;">
-            <h4>💼 AI-Recommended Roles (Comparative Analysis)</h4>
-    `;
-    
-    recommendedRoles.forEach(roleData => {
-        const docId = roleData.document_id || 'Unknown';
-        const candidate = documents.find(d => d.document_id === docId);
-        const name = candidate?.analysis?.llm_analysis?.candidate_name || docId;
-        const roles = roleData.roles || [];
-        
-        html += `
-                <div style="background: var(--bg-card); padding: 1rem; margin: 0.5rem 0; border-radius: 0.5rem; border-left: 3px solid var(--accent);">
-                    <strong style="color: var(--accent);">${name}</strong>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
-        `;
-        
-        roles.forEach((role, idx) => {
-            const title = role.title || 'Unknown Role';
-            const fitScore = role.fit_score || 0;
-            const why = role.why_good_fit || '';
-            const compared = role.compared_to_others || '';
-            const roleColor = fitScore >= 75 ? '#4CAF50' : fitScore >= 50 ? '#FF9800' : '#F44336';
-            
-            html += `
-                        <div style="background: rgba(61, 169, 250, 0.05); padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border);">
-                            <div style="font-weight: bold; margin-bottom: 0.5rem;">${title}</div>
-                            <div style="color: ${roleColor}; font-weight: bold; margin-bottom: 0.5rem;">
-                                Fit: ${fitScore}/100
-                            </div>
-                            ${why ? `<p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                                ${why}
-                            </p>` : ''}
-                            ${compared ? `<p style="font-size: 0.8rem; color: var(--accent); font-style: italic;">
-                                📊 ${compared}
-                            </p>` : ''}
-                        </div>
-            `;
-        });
-        
-        html += `
-                        </div>
-                    </div>
-            `;
-    });
-    
-    html += `
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
-                <!-- Comparative Ranking -->
-                <div>
-                    <h4>📊 Final Ranking (Normalized)</h4>
-                    <table style="width: 100%; font-size: 0.9rem;">
-                        <thead>
-                            <tr style="background: var(--bg-card); border-bottom: 1px solid var(--border);">
-                                <th style="padding: 0.5rem; text-align: left;">Rank</th>
-                                <th style="padding: 0.5rem; text-align: left;">Candidate</th>
-                                <th style="padding: 0.5rem; text-align: right;">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-
-        ranking.forEach(item => {
-            const docId = item.document_id;
-            const candidate = documents.find(d => d.document_id === docId);
-            const candidateName = candidate?.analysis?.llm_analysis?.candidate_name || candidate?.filename || docId;
-            const scoreColor = getScoreColor(item.normalized_fit_score || 0);
-            
-            html += `
-                            <tr>
-                                <td style="padding: 0.5rem; font-weight: bold;">#${item.rank}</td>
-                                <td style="padding: 0.5rem;">${candidateName}</td>
-                                <td style="padding: 0.5rem; text-align: right; color: ${scoreColor}; font-weight: bold;">
-                                    ${item.normalized_fit_score}/100
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="3" style="padding: 0.5rem; font-size: 0.85rem; color: #666; border-bottom: 1px solid var(--border);">
-                                    ${item.rationale || ''}
-                                </td>
-                            </tr>
-            `;
-        });
-
-        html += `
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Top Candidate -->
-                <div>
-                    <h4>🏆 Top Candidate</h4>
-                    <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; border-radius: 0.5rem; border-left: 3px solid #4CAF50;">
-                        <strong>${strongest.reason || 'Best overall fit'}</strong>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background: rgba(76, 175, 80, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                <h4>💪 Strengths Comparison</h4>
-                <p>${strengths || 'No strengths comparison available'}</p>
-            </div>
-            
-            <div style="background: rgba(244, 67, 54, 0.1); padding: 1rem; margin: 1rem 0; border-radius: 0.5rem;">
-                <h4>⚠ Weaknesses Comparison</h4>
-                <p>${weaknesses || 'No weaknesses comparison available'}</p>
-            </div>
-        `;
-        
-        return html;
-    }
-}
-</initial_code>
-
-<edited_code>
-      
-      return html;
-  }
-  
-  function sortBatchResults(sortBy) {
-</edited_code>

@@ -97,7 +97,7 @@ class LLMAnalyzer:
             prompt = self._build_analysis_prompt(resume_markdown, job_requirements, is_single_mode)
             
             # Get analysis from LLM
-            analysis_text = self._call_llm(prompt)
+            analysis_text = self._call_llm(prompt, force_json=True)
             
             # Parse response
             analysis = self._parse_analysis(analysis_text, resume_json, job_requirements)
@@ -109,13 +109,13 @@ class LLMAnalyzer:
             self._log(f"LLM analysis failed: {e}, falling back to heuristics", "ERROR")
             return self._heuristic_analysis(resume_json)
     
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, prompt: str, force_json: bool = True) -> str:
         """
         Call LLM with prompt using streaming for real-time output
         
         ENFORCEMENT:
         - Ollama: temperature ≤ 0.3 (deterministic)
-        - Ollama: format=json (structured output)
+        - Ollama: format=json (structured output, if requested)
         - Streaming mode (no buffering)
         """
         try:
@@ -133,25 +133,37 @@ class LLMAnalyzer:
             
             elif self.provider == "ollama":
                 # MANDATORY ENFORCEMENT FOR OLLAMA
-                self._log(f"[LLM] Calling Ollama with deterministic settings (temp=0.3, format=json)")
-                
-                # Use streaming mode for unbuffered real-time output
-                response = self.client.generate(
-                    model=self.model,
-                    prompt=prompt,
-                    stream=True,                  # ENFORCED: Streaming enabled
-                    temperature=0.3,              # ENFORCED: Low temperature for consistency
-                    format="json"                 # ENFORCED: Structured JSON output
-                )
+                log_message = f"[LLM] Calling Ollama with deterministic settings (temp=0.3, format={'json' if force_json else 'text'})"
+                self._log(log_message)
+
+                # Base parameters for the call
+                params = {
+                    'model': self.model,
+                    'prompt': prompt,
+                    'stream': True,
+                    'options': {
+                        'temperature': 0.3
+                    }
+                }
+
+                # Conditionally add the format parameter
+                if force_json:
+                    params['format'] = 'json'
+
+                response = self.client.generate(**params)
                 
                 # Accumulate streamed response
                 full_response = ""
                 for chunk in response:
-                    if isinstance(chunk, dict):
+                    # Ollama returns Pydantic objects, not dicts
+                    # Access `response` attribute directly
+                    if hasattr(chunk, 'response'):
+                        text_chunk = chunk.response or ""
+                    elif isinstance(chunk, dict):
                         text_chunk = chunk.get('response', '')
-                        full_response += text_chunk
                     else:
-                        full_response += str(chunk)
+                        text_chunk = ""
+                    full_response += text_chunk
                 
                 self._log(f"[LLM] Response received: {len(full_response)} chars")
                 return full_response
@@ -295,7 +307,9 @@ OUTPUT MUST BE VALID JSON IN THIS EXACT STRUCTURE:
     "cultural_fit": {{"score": 0-100, "explanation": "Cultural/experience alignment to job"}},
     "seniority_level": "junior|mid|senior|lead|executive",
     "role_fit_verdict": {{"recommendation": "YES|MAYBE|NO", "confidence": 0-100, "rationale": "Why this recommendation"}},
-    "recommended_roles": ["role 1", "role 2", "role 3", "role 4", "role 5"],
+    "recommended_roles": [
+        {{"role": "Job Title", "fit_score": 0-100, "reasoning": "Why this candidate fits this role"}}
+    ],
     "critical_gaps": ["gap 1", "gap 2"],
     "key_achievements": ["achievement 1", "achievement 2"],
     "overall_score": 0-100,
@@ -390,6 +404,14 @@ VALIDATION RULES:
         NO mock data - based on actual resume content
         Optionally compares to job requirements if provided
         """
+        if isinstance(resume_json, str):
+            try:
+                import json
+                resume_json = json.loads(resume_json)
+            except:
+                self._log("resume_json is a string and failed JSON parsing in heuristic", "ERROR")
+                resume_json = {}
+
         # Count actual data
         skills_count = len(resume_json.get("skills", []))
         experience_count = len(resume_json.get("experience", []))
@@ -399,8 +421,14 @@ VALIDATION RULES:
         skills = resume_json.get("skills", [])
         skill_categories = {}
         for skill in skills:
-            cat = skill.get("category", "other")
-            skill_categories[cat] = skill_categories.get(cat, 0) + 1
+            if isinstance(skill, str):
+                # Handle string skills (from ResumeParser)
+                cat = "technical" # Default category
+                skill_categories[cat] = skill_categories.get(cat, 0) + 1
+            elif isinstance(skill, dict):
+                # Handle dict skills (from older parser/LLM)
+                cat = skill.get("category", "other")
+                skill_categories[cat] = skill_categories.get(cat, 0) + 1
         
         # Determine seniority based on experience
         seniority = "junior"
@@ -735,7 +763,7 @@ Return ONLY the JSON array, no additional text."""
             
             # Call LLM with ALL candidates in single request
             self._log("Calling LLM for comparative evaluation...")
-            response = self._call_llm(prompt)
+            response = self._call_llm(prompt, force_json=True)
             
             # Parse comparative response
             comparative_result = self._parse_comparative_response(response, candidates)
@@ -755,181 +783,42 @@ Return ONLY the JSON array, no additional text."""
     
     def _build_comparative_prompt(self, candidates: List[Dict], job_requirements: str) -> str:
         """
-        Build prompt for PASS 2 comparative analysis
-        
-        CRITICAL: This prompt must force Qwen2.5 to:
-        1. Compare candidates against each other comprehensively
-        2. Generate detailed profiles, experience summaries, skills, certificates for EACH candidate
-        3. Provide AI fit scores and evaluation factors comparing all candidates
-        4. Recommend at least 5 roles PER candidate based on comparative analysis
+        Simplified comparative analysis prompt for Qwen2.5
+        Focus on core fields only, minimal formatting requirements
         """
         
-        # Build candidate profiles string with FULL details
+        # Build candidate profiles
         candidate_profiles = ""
         for idx, cand in enumerate(candidates, 1):
             doc_id = cand.get("document_id", f"DOC_{idx}")
-            name = cand.get("name", "Unknown")
-            filename = cand.get("filename", "resume.pdf")
-            experience = cand.get("experience_summary", "Not specified")
-            skills = cand.get("skills", {})
+            name = cand.get("name", f"Candidate_{idx}")
+            experience = cand.get("experience_summary", "")[:200]  # Truncate to 200 chars
+            skills = cand.get("skills", {}).get("technical", [])[:8]
+            score = int(cand.get("preliminary_fit_score", 0))
+            seniority = cand.get("seniority_level", "mid")
             
-            tech_skills = skills.get("technical", [])[:10]
-            soft_skills = skills.get("soft", [])[:5]
-            preliminary_score = cand.get("preliminary_fit_score", 0)
-            
-            candidate_profiles += f"""
-CANDIDATE {idx} (ID: {doc_id}, File: {filename})
-- Name: {name}
-- Experience: {experience}
-- Technical Skills: {', '.join(tech_skills) if tech_skills else 'N/A'}
-- Soft Skills: {', '.join(soft_skills) if soft_skills else 'N/A'}
-- Preliminary Score: {preliminary_score}/100
-"""
+            candidate_profiles += f"Candidate {idx} ({doc_id}): {name}, {seniority}, {score}/100, Skills: {', '.join(skills)}\n"
         
-        prompt = f"""YOU ARE A COMPARATIVE RECRUITMENT ANALYST using qwen2.5:7b-instruct-q4_K_M
+        prompt = f"""Compare these {len(candidates)} candidates and return ONLY valid JSON:
 
-CRITICAL MISSION: Perform COMPREHENSIVE COMPARATIVE ANALYSIS of ALL candidates.
-Do NOT evaluate candidates independently. You MUST compare them AGAINST EACH OTHER on every dimension.
-
-JOB REQUIREMENTS:
-{job_requirements if job_requirements else "Generic evaluation - no specific requirements"}
-
-CANDIDATES TO COMPARE:
+CANDIDATES:
 {candidate_profiles}
 
-MANDATORY OUTPUT STRUCTURE (JSON):
-You MUST generate ALL of the following fields with COMPLETE data for EVERY candidate:
+JOB CONTEXT: {job_requirements if job_requirements else 'General evaluation'}
 
+Return ONLY this exact JSON structure (no markdown, no explanation):
 {{
+    "executive_summary": "1 paragraph comparing all candidates",
     "comparative_ranking": [
-        {{
-            "document_id": "DOC_X",
-            "rank": 1,
-            "normalized_fit_score": 0-100,
-            "rationale": "Detailed explanation comparing to other candidates"
-        }}
+        {{"document_id": "DOC_1", "rank": 1, "normalized_fit_score": 85, "rationale": "Why ranked first"}}
     ],
-    
-    "candidate_profiles": [
-        {{
-            "document_id": "DOC_X",
-            "name": "Candidate Name",
-            "summary": "2-3 sentence profile comparing strengths/weaknesses to other candidates",
-            "seniority_level": "junior|mid|senior|lead|executive",
-            "years_experience": X,
-            "compared_to_others": "How this candidate compares to the group"
-        }}
-    ],
-    
-    "experience_summaries": [
-        {{
-            "document_id": "DOC_X",
-            "experience_quality": "Assessment of experience depth compared to others",
-            "key_positions": ["Role 1", "Role 2"],
-            "comparative_strength": "Is this candidate more/less experienced than others? By how much?"
-        }}
-    ],
-    
-    "skills_and_entities": [
-        {{
-            "document_id": "DOC_X",
-            "technical_skills": ["skill1", "skill2", "skill3", ...],
-            "soft_skills": ["skill1", "skill2", ...],
-            "certifications": ["cert1", "cert2", ...],
-            "unique_skills": ["Skills only this candidate has"],
-            "common_skills": ["Skills shared with other candidates"],
-            "skill_gaps": ["Skills others have but this candidate lacks"]
-        }}
-    ],
-    
-    "ai_fit_scores": [
-        {{
-            "document_id": "DOC_X",
-            "overall_fit_score": 0-100,
-            "compared_to_group": "above average|average|below average",
-            "score_breakdown": {{
-                "technical_fit": 0-100,
-                "experience_fit": 0-100,
-                "cultural_fit": 0-100,
-                "skill_coverage": 0-100
-            }},
-            "why_this_score": "Explanation comparing to other candidates"
-        }}
-    ],
-    
-    "evaluation_factors": [
-        {{
-            "document_id": "DOC_X",
-            "strengths": ["strength1 (compared to others)", "strength2", ...],
-            "weaknesses": ["weakness1 (relative to group)", "weakness2", ...],
-            "opportunities": ["opportunity1", "opportunity2"],
-            "threats": ["threat1", "threat2"],
-            "comparative_advantages": ["What makes this candidate stand out"],
-            "comparative_disadvantages": ["Where this candidate falls short"]
-        }}
-    ],
-    
-    "recommended_roles": [
-        {{
-            "document_id": "DOC_X",
-            "roles": [
-                {{
-                    "title": "Role Title",
-                    "fit_score": 0-100,
-                    "why_good_fit": "Explanation",
-                    "compared_to_others": "Would other candidates fit this role better/worse?"
-                }},
-                ... (MINIMUM 5 roles per candidate)
-            ]
-        }}
-    ],
-    
-    "strengths_comparison": "Detailed comparison of strengths across ALL candidates. Who is strongest where? Use document IDs.",
-    
-    "weaknesses_comparison": "Detailed comparison of weaknesses. Who struggles with what? Which candidate has the most critical gaps? Use document IDs.",
-    
-    "skill_coverage_matrix": {{
-        "DOC_1": {{"covered": ["skill1", "skill2"], "missing": ["skill3"]}},
-        "DOC_2": {{"covered": [...], "missing": [...]}},
-        ...
-    }},
-    
-    "strongest_candidate": {{
-        "document_id": "DOC_X",
-        "reason": "Why this candidate outperforms all others"
-    }},
-    
-    "best_skill_coverage": {{
-        "document_id": "DOC_X",
-        "skills": ["comprehensive list"],
-        "reason": "Why this candidate has best skill coverage compared to others"
-    }},
-    
-    "hiring_recommendations": {{
-        "DOC_1": "Hire/Don't Hire with detailed reasoning comparing to other candidates",
-        "DOC_2": "Different recommendation based on comparative analysis",
-        ...
-    }},
-    
-    "executive_summary": "2-3 paragraph comprehensive summary comparing ALL candidates, highlighting who excels where, final rankings, and hiring recommendations"
-}}
-
-CRITICAL REQUIREMENTS:
-1. EVERY array must have entries for ALL {len(candidates)} candidates
-2. Reference candidates by document_id throughout (DOC_1, DOC_2, etc.)
-3. Use COMPARATIVE language: "stronger than", "better than", "lacks compared to", "outperforms"
-4. Explain WHY candidate A ranks above/below candidate B
-5. Recommended roles MUST have at least 5 roles per candidate with comparative analysis
-6. Scores must be normalized across the group (not all 80+)
-7. Identify unique strengths AND weaknesses for each candidate relative to others
-8. Skills and certifications must be extracted and compared across all candidates
-9. candidate_profiles MUST include name, summary, seniority, years_experience for ALL candidates
-10. experience_summaries MUST detail work history and compare experience depth between candidates
-11. skills_and_entities MUST list technical_skills, soft_skills, certifications, unique_skills, and gaps
-12. ai_fit_scores MUST include overall_fit_score and score_breakdown for ALL candidates
-13. evaluation_factors MUST include strengths, weaknesses, opportunities, threats, and comparative advantages/disadvantages
-
-OUTPUT ONLY VALID JSON. No markdown, no explanations outside JSON."""
+    "strengths_comparison": "Compare strengths across all candidates",
+    "weaknesses_comparison": "Compare weaknesses across all candidates",
+    "skill_coverage_matrix": {{"DOC_1": {{"covered": ["skill1"], "missing": ["skill2"]}}}},
+    "strongest_candidate": {{"document_id": "DOC_1", "reason": "Why best"}},
+    "best_skill_coverage": {{"document_id": "DOC_1", "skills": ["list"], "reason": "Why"}},
+    "hiring_recommendations": {{"DOC_1": "HIRE/CONSIDER/MAYBE with brief reason"}}
+}}"""
         
         return prompt
     
@@ -950,8 +839,11 @@ OUTPUT ONLY VALID JSON. No markdown, no explanations outside JSON."""
             # Verify it's truly comparative (not just repeated single evaluations)
             self._verify_comparative_quality(comparative_data, candidates)
             
+            # Ensure all required frontend fields are present with proper structure
+            structured_data = self._structure_for_frontend(comparative_data, candidates)
+            
             return {
-                "comparative_analysis": comparative_data,
+                "comparative_analysis": structured_data,
                 "success": True
             }
             
@@ -965,6 +857,135 @@ OUTPUT ONLY VALID JSON. No markdown, no explanations outside JSON."""
                 },
                 "success": False
             }
+    
+    def _structure_for_frontend(self, data: Dict, candidates: List[Dict]) -> Dict:
+        """
+        Ensure the comparative data is structured exactly as frontend expects
+        Includes smart fallbacks to ensure fields are never completely empty
+        """
+        structured = {
+            "executive_summary": data.get("executive_summary", ""),
+            "comparative_ranking": data.get("comparative_ranking", []),
+            "strengths_comparison": data.get("strengths_comparison", ""),
+            "weaknesses_comparison": data.get("weaknesses_comparison", ""),
+            "skill_coverage_matrix": data.get("skill_coverage_matrix", {}),
+            "strongest_candidate": data.get("strongest_candidate", {}),
+            "best_skill_coverage": data.get("best_skill_coverage", {}),
+            "hiring_recommendations": data.get("hiring_recommendations", {})
+        }
+        
+        # CRITICAL: Generate fallback data if core fields are missing
+        # This ensures the frontend never displays completely empty sections
+        if not structured["comparative_ranking"]:
+            self._log("⚠ No comparative_ranking in response, generating fallback", "WARNING")
+            # Generate basic ranking from candidates' scores if available
+            structured["comparative_ranking"] = self._generate_fallback_ranking(candidates)
+        
+        if not structured["executive_summary"]:
+            self._log("⚠ No executive_summary in response, generating fallback", "WARNING")
+            structured["executive_summary"] = self._generate_fallback_summary(candidates)
+        
+        if not structured["strengths_comparison"]:
+            self._log("⚠ No strengths_comparison in response, generating fallback", "WARNING")
+            structured["strengths_comparison"] = self._generate_fallback_strengths(candidates)
+        
+        if not structured["weaknesses_comparison"]:
+            self._log("⚠ No weaknesses_comparison in response, generating fallback", "WARNING")
+            structured["weaknesses_comparison"] = self._generate_fallback_weaknesses(candidates)
+        
+        if not structured["skill_coverage_matrix"]:
+            self._log("⚠ No skill_coverage_matrix in response, generating fallback", "WARNING")
+            structured["skill_coverage_matrix"] = self._generate_fallback_skills(candidates)
+        
+        if not structured["hiring_recommendations"]:
+            self._log("⚠ No hiring_recommendations in response, generating fallback", "WARNING")
+            structured["hiring_recommendations"] = self._generate_fallback_recommendations(candidates)
+        
+        # Optional fields that enhance the frontend display
+        if "candidate_profiles" in data:
+            structured["candidate_profiles"] = data["candidate_profiles"]
+        if "experience_summaries" in data:
+            structured["experience_summaries"] = data["experience_summaries"]
+        if "skills_and_entities" in data:
+            structured["skills_and_entities"] = data["skills_and_entities"]
+        if "ai_fit_scores" in data:
+            structured["ai_fit_scores"] = data["ai_fit_scores"]
+        if "evaluation_factors" in data:
+            structured["evaluation_factors"] = data["evaluation_factors"]
+        if "recommended_roles" in data:
+            structured["recommended_roles"] = data["recommended_roles"]
+        
+        self._log(f"✓ Structured data for frontend with {len(structured)} fields")
+        return structured
+    
+    def _generate_fallback_ranking(self, candidates: List[Dict]) -> List[Dict]:
+        """Generate fallback ranking from preliminary scores"""
+        ranking = []
+        sorted_candidates = sorted(
+            candidates,
+            key=lambda x: x.get("preliminary_fit_score", 0),
+            reverse=True
+        )
+        for rank, cand in enumerate(sorted_candidates, 1):
+            ranking.append({
+                "document_id": cand.get("document_id", f"doc_{rank}"),
+                "rank": rank,
+                "normalized_fit_score": int(cand.get("preliminary_fit_score", 0)),
+                "rationale": f"Ranked #{rank} based on PASS 1 analysis"
+            })
+        return ranking
+    
+    def _generate_fallback_summary(self, candidates: List[Dict]) -> str:
+        """Generate fallback executive summary"""
+        names = [c.get("name", "Candidate") for c in candidates]
+        if len(names) == 2:
+            return f"Comparative analysis of {names[0]} and {names[1]}. Both candidates have been evaluated based on their resume content, experience, and skill alignment."
+        elif len(names) > 2:
+            return f"Comparative analysis of {', '.join(names[:-1])}, and {names[-1]}. All candidates have been evaluated based on their resume content, experience, and skill alignment."
+        return "Comparative candidate analysis based on PASS 1 results."
+    
+    def _generate_fallback_strengths(self, candidates: List[Dict]) -> str:
+        """Generate fallback strengths comparison"""
+        parts = []
+        for cand in candidates:
+            skills = cand.get("skills", {}).get("technical", [])[:3]
+            seniority = cand.get("seniority_level", "Unknown")
+            if skills:
+                parts.append(f"{cand.get('name', 'Candidate')} ({seniority}): {', '.join(skills)}")
+        return " | ".join(parts) if parts else "Candidates assessed on technical and soft skills from PASS 1 analysis."
+    
+    def _generate_fallback_weaknesses(self, candidates: List[Dict]) -> str:
+        """Generate fallback weaknesses comparison"""
+        return f"Detailed weakness analysis pending. {len(candidates)} candidate(s) evaluated based on available experience and skills."
+    
+    def _generate_fallback_skills(self, candidates: List[Dict]) -> Dict:
+        """Generate fallback skill coverage matrix"""
+        matrix = {}
+        for cand in candidates:
+            doc_id = cand.get("document_id", "Unknown")
+            skills = cand.get("skills", {})
+            matrix[doc_id] = {
+                "covered": skills.get("technical", [])[:5],
+                "missing": []  # Will be filled based on job requirements if available
+            }
+        return matrix
+    
+    def _generate_fallback_recommendations(self, candidates: List[Dict]) -> Dict:
+        """Generate fallback hiring recommendations"""
+        recs = {}
+        for cand in candidates:
+            doc_id = cand.get("document_id", "Unknown")
+            score = cand.get("preliminary_fit_score", 0)
+            
+            if score >= 75:
+                recommendation = "STRONG CANDIDATE - Recommend for interview based on PASS 1 analysis"
+            elif score >= 60:
+                recommendation = "GOOD CANDIDATE - Consider for interview based on PASS 1 analysis"
+            else:
+                recommendation = "POSSIBLE CANDIDATE - Review further based on PASS 1 analysis"
+            
+            recs[doc_id] = recommendation
+        return recs
     
     def _verify_comparative_quality(self, comparative_data: Dict, candidates: List[Dict]):
         """

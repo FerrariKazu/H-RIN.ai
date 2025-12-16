@@ -39,6 +39,7 @@ pdf_processor = None
 nlp_engine = None
 resume_reconstructor = None
 llm_analyzer = None
+executive_summary_engine = None
 components_initialized = False
 
 @asynccontextmanager
@@ -47,7 +48,7 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup/shutdown events
     This replaces the deprecated @app.on_event decorators
     """
-    global pdf_processor, nlp_engine, resume_reconstructor, llm_analyzer, components_initialized
+    global pdf_processor, nlp_engine, resume_reconstructor, llm_analyzer, executive_summary_engine, components_initialized
     
     # STARTUP
     logger.info("=" * 70)
@@ -57,40 +58,48 @@ async def lifespan(app: FastAPI):
     
     try:
         # Import pipeline components
-        logger.info("📦 Step 1/5: Importing pipeline components...")
+        logger.info("📦 Step 1/6: Importing pipeline components...")
         sys.stdout.flush()
         
         from backend.pipeline.pdf_processor import PDFProcessor
         from backend.pipeline.nlp_engine_v2 import NLPEngine
         from backend.pipeline.resume_reconstructor import ResumeReconstructor
         from backend.pipeline.llm_analyzer import LLMAnalyzer
+        from backend.pipeline.executive_summary import ExecutiveSummaryEngine
         
         logger.info("✓ All pipeline components imported successfully")
         sys.stdout.flush()
         
         # Initialize PDF Processor (fast)
-        logger.info("📄 Step 2/5: Initializing PDF Processor...")
+        logger.info("📄 Step 2/6: Initializing PDF Processor...")
         sys.stdout.flush()
         pdf_processor = PDFProcessor()
         logger.info("✓ PDF Processor ready")
         sys.stdout.flush()
         
         # Initialize Resume Reconstructor (fast)
-        logger.info("🔧 Step 3/5: Initializing Resume Reconstructor...")
+        logger.info("🔧 Step 3/6: Initializing Resume Reconstructor...")
         sys.stdout.flush()
         resume_reconstructor = ResumeReconstructor()
         logger.info("✓ Resume Reconstructor ready")
         sys.stdout.flush()
         
         # Initialize LLM Analyzer (fast if no immediate API calls)
-        logger.info("🤖 Step 4/5: Initializing LLM Analyzer...")
+        logger.info("🤖 Step 4/6: Initializing LLM Analyzer...")
         sys.stdout.flush()
         llm_analyzer = LLMAnalyzer(model="qwen2.5:7b-instruct-q4_K_M")
         logger.info("✓ LLM Analyzer ready with Ollama model: qwen2.5:7b-instruct-q4_K_M")
         sys.stdout.flush()
         
+        # Initialize Executive Summary Engine (uses llm_analyzer)
+        logger.info("📋 Step 5/6: Initializing Executive Summary Engine...")
+        sys.stdout.flush()
+        executive_summary_engine = ExecutiveSummaryEngine(llm_analyzer=llm_analyzer)
+        logger.info("✓ Executive Summary Engine ready")
+        sys.stdout.flush()
+        
         # Initialize NLP Engine (SLOW - this is likely where it hangs)
-        logger.info("🧠 Step 5/5: Initializing NLP Engine (this may take 30-60 seconds)...")
+        logger.info("🧠 Step 6/6: Initializing NLP Engine (this may take 30-60 seconds)...")
         logger.info("    Loading spaCy models and transformers...")
         logger.info("    Please wait - downloading models if first run...")
         sys.stdout.flush()
@@ -220,6 +229,59 @@ class BatchAnalyzeResponse(BaseModel):
     failed_count: int
     processing_time: float
     success: bool
+
+
+class CandidateProfile(BaseModel):
+    """Candidate profile with mixed deterministic and analytical data"""
+    candidate_id: str
+    document_id: str
+    filename: Optional[str] = "Unknown"  # Added for frontend compatibility
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    linkedin: Optional[str] = None
+    github: Optional[str] = None
+    other_links: List[str] = []
+    
+    # Content Fields
+    education: List[Dict] = []
+    experience: List[Dict] = []
+    skills: List[str] = []
+    certifications: List[str] = []
+    named_entities: Dict = {}  # Added to support NLP extraction passthrough
+    
+    analysis_fields_header: str = "" # dummy field to keep comment
+    seniority_level: str = "Unknown"
+    years_experience: float = 0.0
+    preliminary_fit_score: int = 0
+    llm_analysis: Dict = {}
+    
+    # Batch Mode Job Fit Fields (populated when CV count > 1)
+    job_fit_score: int = 0
+    job_fit_reasoning: str = ""
+    
+    # Frontend Compatibility
+    status: str = "success"
+    error: Optional[str] = None
+
+
+class ExecutiveSummaryResponse(BaseModel):
+    """Response with guaranteed three sections: profiles, experience summary, AI assessment"""
+    mode: str  # "single" or "batch"
+    batch_id: str
+    candidates: List[CandidateProfile]
+    # Frontend aliases
+    candidate: Optional[CandidateProfile] = None
+    documents: List[CandidateProfile] = []
+    
+    experience_summary: str
+    ai_executive_assessment: str
+    job_requirements: str
+    processing_time: float
+    success: bool
+    
+    # Additional analysis fields for frontend batch view
+    comparative_analysis: Optional[Dict] = None
 
 # =====================================================
 # HELPER FUNCTIONS
@@ -551,269 +613,240 @@ async def batch_analyze(
     batch_id: str = ""
 ):
     """
-    Analyze one or more PDF resumes - AUTOMATIC MODE DETECTION
+    Analyze 1-5 PDF resumes with guaranteed sections.
     
-    - 1 file → PASS 1 only (single-CV mode, no comparison)
-    - 2-5 files → PASS 1 + PASS 2 (batch mode with comparison)
+    GUARANTEED OUTPUT (all sections always populated):
+    - Candidate Profiles: Deterministic personal info (name, email, phone, etc.)
+    - Experience Summary: HR-grade summary comparing candidates (Qwen)
+    - AI Executive Assessment: Comparative evaluation (Qwen)
     
-    Response structure depends on file count:
-    - mode: "single" → {mode, batch_id, candidate, ...}
-    - mode: "batch" → {mode, batch_id, documents, comparative_analysis, ...}
+    Modes:
+    - 1 file → single-CV mode (no comparison language)
+    - 2-5 files → batch mode (comparative analysis)
     """
     check_components_ready()
     
     start_time = datetime.now()
+    batch_id = batch_id or f"batch_{int(start_time.timestamp())}"
     temp_files = []
-    documents_results = []
+    
+    logger.info("=" * 70)
+    logger.info(f"📥 BATCH ANALYZE REQUEST (batch_id={batch_id})")
+    logger.info(f"   Files: {len(files)}")
+    logger.info(f"   Job requirements: {'Yes' if job_requirements.strip() else 'No'}")
+    logger.info("=" * 70)
+    
+    # Validate file count
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="At least 1 file required")
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 files allowed")
+    
+    is_single_mode = len(files) == 1
+    mode = "single" if is_single_mode else "batch"
     
     try:
-        # STEP 0: INPUT NORMALIZATION - Always convert to array
-        if not files or len(files) == 0:
-            raise HTTPException(status_code=400, detail="No files provided")
-        
-        # Normalize to list (should already be list, but ensure it)
-        file_list = list(files) if isinstance(files, (list, tuple)) else [files]
-        
-        # Validate file count
-        if len(file_list) > 5:
-            raise HTTPException(status_code=400, detail="Maximum 5 files allowed per batch")
-        
-        # Validate all are PDFs
-        for file in file_list:
-            if not file.filename.lower().endswith('.pdf'):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"File '{file.filename}' is not a PDF. Only PDF files are accepted."
-                )
-        
-        # STEP 1: DETERMINE MODE based on file count
-        is_single_mode = len(file_list) == 1
-        mode = "single" if is_single_mode else "batch"
-        
+        # STEP 1: Extract and analyze each file individually (PASS 1)
         logger.info(f"{'='*70}")
-        logger.info(f"🚀 Starting analysis: {len(file_list)} file(s), mode={mode}")
-        if is_single_mode:
-            logger.info(f"   ℹ SINGLE-CV MODE: PASS 1 only (no comparative analysis)")
-        else:
-            logger.info(f"   ℹ BATCH MODE: PASS 1 + PASS 2 (comparative analysis enabled)")
-        logger.info(f"   Job requirements: {len(job_requirements.split()) if job_requirements.strip() else 0} words")
+        logger.info(f"🔄 PASS 1: Extracting and analyzing {len(files)} resumes")
         logger.info(f"{'='*70}")
         
-        # Process each file independently
-        for idx, file in enumerate(file_list, 1):
-            document_id = f"doc_{batch_id}_{idx}_{datetime.now().timestamp()}"
-            logger.info(f"Processing document {idx}/{len(files)}: {file.filename} (ID: {document_id})")
+        candidates = []
+        successful_count = 0
+        
+        for idx, file in enumerate(files, 1):
+            document_id = f"DOC_{idx}"
+            logger.info(f"\n[{idx}] Processing: {file.filename}")
             
             temp_path = None
             try:
-                # Step 1: Save temporary file
-                temp_path = f"temp_{datetime.now().timestamp()}_{file.filename}"
-                with open(temp_path, "wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
+                # Save temp file
+                temp_path = f"temp_{int(start_time.timestamp())}_{file.filename}"
+                contents = await file.read()
+                with open(temp_path, "wb") as f:
+                    f.write(contents)
                 temp_files.append(temp_path)
-                
-                logger.info(f"  [{idx}] Saved to temp: {temp_path}")
                 
                 # Step 2: PDF Extraction
                 logger.info(f"  [{idx}] Extracting PDF text...")
                 extraction_result = pdf_processor.process(temp_path)
                 raw_text = extraction_result.raw_text
                 
-                if not raw_text or len(raw_text.strip()) < 50:
-                    raise ValueError("Extracted text too short or empty")
+                if not raw_text or len(raw_text) < 50:
+                    logger.warning(f"     ⚠ Insufficient text extracted")
+                    continue
                 
-                logger.info(f"  [{idx}] Extracted {len(raw_text)} characters")
+                logger.info(f"     ✓ Extracted {len(raw_text)} chars")
                 
-                # Step 3: NLP Analysis
-                logger.info(f"  [{idx}] Running NLP analysis...")
-                nlp_result = nlp_engine.extract(raw_text)
+                # Parse resume deterministically (NO LLM)
+                logger.info(f"     📋 Parsing resume structure...")
+                from backend.pipeline.resume_parser import ResumeParser
+                parser = ResumeParser()
+                parsed_data = parser.parse(raw_text, filename=file.filename)
                 
-                # Step 4: Resume Reconstruction
-                logger.info(f"  [{idx}] Reconstructing resume...")
-                reconstruction_result = resume_reconstructor.reconstruct(
-                    raw_text=raw_text,
-                    nlp_data=nlp_result,
-                    sections=nlp_result.get("sections", {})
-                )
-                
-                resume_markdown = reconstruction_result.get("markdown", "")
-                resume_json = reconstruction_result.get("json", {})
-                
-                # Step 5: LLM PASS 1 Analysis
-                logger.info(f"  [{idx}] Running LLM PASS 1 (single-candidate analysis)...")
+                # Perform LLM analysis for additional insights
+                logger.info(f"     🤖 Running LLM analysis...")
                 llm_analysis = llm_analyzer.analyze(
-                    resume_json=resume_json,
-                    resume_markdown=resume_markdown,
+                    resume_json=parsed_data,
+                    resume_markdown=raw_text, # Use raw text as markdown fallback since reconstruction skipped
                     raw_text=raw_text,
                     job_requirements=job_requirements,
-                    is_single_mode=is_single_mode  # Tell analyzer if single or batch
+                    is_single_mode=is_single_mode
                 )
                 
-                logger.info(f"  [{idx}] Analysis complete - Score: {llm_analysis.get('llm_analysis', {}).get('overall_score', 'N/A')}")
+                logger.info(f"     🔍 LLM Analysis Type: {type(llm_analysis)}")
+                if isinstance(llm_analysis, str):
+                    logger.warning(f"     ⚠ LLM Analysis returned string instead of dict: {llm_analysis[:100]}...")
+                    try:
+                        import json
+                        llm_analysis = json.loads(llm_analysis)
+                    except:
+                        logger.error("     ❌ Could not parse LLM analysis string as JSON")
+                        llm_analysis = {}
+                elif not isinstance(llm_analysis, dict):
+                    logger.warning(f"     ⚠ LLM Analysis returned unexpected type: {type(llm_analysis)}")
+                    llm_analysis = {}
                 
-                # Build document result
-                doc_result = DocumentResult(
-                    document_id=document_id,
-                    filename=file.filename,
-                    status="success",
-                    extraction={
-                        "raw_text_preview": raw_text[:300] + "..." if len(raw_text) > 300 else raw_text,
-                        "char_count": len(raw_text),
-                        "confidence": extraction_result.confidence,
-                        "document_type": "Scanned" if extraction_result.needs_ocr else "Digital"
-                    },
-                    analysis={
-                        "resume_json": resume_json,
-                        "resume_markdown": resume_markdown,
-                        "llm_analysis": llm_analysis
-                    }
-                )
+                # Build candidate dict with strict division of responsibility
+                # 1. Deterministic fields (from ResumeParser)
+                # 2. Semantic fields (Skill - from Qwen as requested)
                 
-                documents_results.append(doc_result)
-                logger.info(f"✓ Document {idx} completed successfully")
+                # Extract skills from LLM analysis if available (Preferred per user request)
+                final_skills = []
+                if llm_analysis and "skills" in llm_analysis:
+                    llm_skills = llm_analysis["skills"]
+                    # Handle both list of strings or dict with categories
+                    if isinstance(llm_skills, list):
+                        final_skills = llm_skills
+                    elif isinstance(llm_skills, dict):
+                        # Flatten dictionary values
+                        for cat_skills in llm_skills.values():
+                            if isinstance(cat_skills, list):
+                                final_skills.extend(cat_skills)
+                
+                # Fallback to deterministic regex skills if LLM failed
+                if not final_skills:
+                    final_skills = parsed_data.get("skills", [])
+                
+                # Safely extract metrics
+                years_experience = 0
+                seniority = "mid"
+                fit_score = 0
+                
+                if isinstance(llm_analysis, dict):
+                    # Extract Seniority
+                    seniority = llm_analysis.get("seniority_level", "mid")
+                    if not isinstance(seniority, str):
+                        seniority = "mid"
+                        
+                    # Extract Fit Score
+                    fit_score = llm_analysis.get("overall_score", 0)
+                    if not isinstance(fit_score, (int, float)):
+                        fit_score = 0
+                        
+                    # Extract Years Experience (handling nested dict issues)
+                    key_metrics = llm_analysis.get("key_metrics", {})
+                    if isinstance(key_metrics, dict):
+                        years_experience = key_metrics.get("years_experience", 0)
+                    else:
+                        logger.warning(f"     ⚠ key_metrics is not a dict: {type(key_metrics)}")
+                        years_experience = 0
+                        
+                candidate = {
+                    "candidate_id": parsed_data["candidate_id"],
+                    "document_id": document_id,
+                    "filename": file.filename,
+                    # Deterministic Data (Required)
+                    "name": parsed_data.get("name"),
+                    "email": parsed_data.get("email"),
+                    "phone": parsed_data.get("phone"),
+                    "linkedin": parsed_data.get("linkedin"),
+                    "github": parsed_data.get("github"),
+                    "other_links": parsed_data.get("other_links", []),
+                    "education": parsed_data.get("education", []),
+                    "experience": parsed_data.get("experience", []),
+                    # Qwen Data (Preferred for Skills)
+                    "skills": final_skills,
+                    "certifications": parsed_data.get("certifications", []),
+                    # Analytical Data
+                    "seniority_level": seniority,
+                    "years_experience": years_experience,
+                    "preliminary_fit_score": fit_score,
+                    "llm_analysis": llm_analysis,  # Pass full analysis for frontend
+                }
+                
+                candidates.append(candidate)
+                successful_count += 1
+                logger.info(f"     ✅ Analysis complete - {candidate['name']}")
                 
             except Exception as e:
-                error_msg = f"Document processing failed: {str(e)}"
-                logger.error(f"✗ Document {idx} failed: {error_msg}")
+                logger.error(f"     ❌ Failed to build candidate: {str(e)}")
                 logger.error(traceback.format_exc())
-                
-                # Record failure
-                doc_result = DocumentResult(
-                    document_id=document_id,
-                    filename=file.filename,
-                    status="failed",
-                    error=error_msg
-                )
-                
-                documents_results.append(doc_result)
             
             finally:
-                # Cleanup this file's temp
                 if temp_path and os.path.exists(temp_path):
                     try:
                         os.remove(temp_path)
                     except:
                         pass
         
-        processing_time_pass1 = (datetime.now() - start_time).total_seconds()
+        if successful_count == 0:
+            raise HTTPException(status_code=400, detail="Could not extract valid data from any file")
         
-        # Count results
-        success_count = sum(1 for d in documents_results if d.status == "success")
-        failed_count = len(documents_results) - success_count
+        logger.info(f"\n✅ PASS 1 Complete: {successful_count}/{len(files)} successful")
         
+        # STEP 2: Generate Executive Summary sections
+        logger.info(f"\n{'='*70}")
+        logger.info(f"📊 PASS 2: Generating executive summary sections")
         logger.info(f"{'='*70}")
-        logger.info(f"✅ PASS 1 COMPLETE: {success_count} succeeded, {failed_count} failed")
-        logger.info(f"   Time: {processing_time_pass1:.2f}s")
-        logger.info(f"{'='*70}")
         
-        # STEP 2: Branch by CV count
-        # If single CV: Return immediately with PASS 1 only (NO comparative analysis)
-        if is_single_mode and success_count == 1:
-            logger.info(f"{'='*70}")
-            logger.info(f"✅ SINGLE-CV ANALYSIS COMPLETE")
-            logger.info(f"   Mode: single (no comparative analysis)")
-            logger.info(f"   Result: Full PASS 1 analysis")
-            logger.info(f"{'='*70}")
-            
-            processing_time_total = (datetime.now() - start_time).total_seconds()
-            
-            single_result = documents_results[0]
-            return SingleCVResponse(
-                mode="single",
-                batch_id=batch_id,
-                job_requirements=job_requirements,
-                job_requirements_used=bool(job_requirements.strip()),
-                candidate={
-                    "document_id": single_result.document_id,
-                    "filename": single_result.filename,
-                    "llm_analysis": single_result.analysis.get("llm_analysis", {}) if single_result.analysis else {},
-                    "resume_json": single_result.analysis.get("resume_json", {}) if single_result.analysis else {},
-                    "extraction": single_result.extraction
-                },
-                processing_time=processing_time_total,
-                success=True
-            )
-        
-        # PASS 2: Comparative Analysis (only if batch mode AND 2+ successful candidates)
-        comparative_analysis = None
-        if not is_single_mode and success_count > 1:  # Only comparative if batch AND 2+ candidates
-            logger.info("=" * 70)
-            logger.info("🚀 STARTING PASS 2: CROSS-CANDIDATE COMPARATIVE ANALYSIS")
-            logger.info(f"   Comparing {success_count} candidates...")
-            logger.info("=" * 70)
-            
-            try:
-                # Extract successful candidates for comparison
-                successful_docs = []
-                for doc_result in documents_results:
-                    if doc_result.status == "success" and doc_result.analysis:
-                        llm_analysis = doc_result.analysis.get("llm_analysis", {})
-                        resume_json = doc_result.analysis.get("resume_json", {})
-                        
-                        candidate_data = {
-                            "document_id": doc_result.document_id,
-                            "filename": doc_result.filename,
-                            "name": llm_analysis.get("candidate_name", "Unknown"),
-                            "experience_summary": llm_analysis.get("experience_summary", ""),
-                            "skills": llm_analysis.get("skills", {}),
-                            "certifications": llm_analysis.get("certifications", []),
-                            "preliminary_fit_score": llm_analysis.get("overall_score", 0),
-                            "seniority_level": llm_analysis.get("seniority_level", "mid"),
-                            "years_experience": llm_analysis.get("key_metrics", {}).get("years_experience", 0),
-                            "resume_json": resume_json
-                        }
-                        successful_docs.append(candidate_data)
-                
-                # Call LLM for comparative analysis (single call with ALL candidates)
-                comparative_result = llm_analyzer.analyze_comparative(
-                    candidates=successful_docs,
-                    job_requirements=job_requirements
-                )
-                
-                if comparative_result and "comparative_analysis" in comparative_result:
-                    comparative_analysis = comparative_result["comparative_analysis"]
-                    logger.info("✓ PASS 2 Comparative analysis complete")
-                else:
-                    logger.warning("⚠ Comparative analysis returned empty result")
-                
-            except Exception as e:
-                logger.error(f"✗ Comparative analysis failed: {str(e)}")
-                logger.error(traceback.format_exc())
-                # Continue without comparative analysis - not critical
-        
-        elif not is_single_mode and success_count == 1:
-            logger.info("ℹ Only 1 successful candidate from batch - skipping PASS 2 comparative analysis")
-        
-        processing_time_total = (datetime.now() - start_time).total_seconds()
-        
-        # Create batch response with both PASS 1 and optional PASS 2 results
-        batch_response = BatchAnalyzeResponse(
-            mode="batch",
-            batch_id=batch_id,
+        summary_result = executive_summary_engine.process_candidates(
+            candidates=candidates,
             job_requirements=job_requirements,
-            documents=documents_results,
-            comparative_analysis=comparative_analysis,
-            job_requirements_used=bool(job_requirements.strip()),
-            job_requirements_provided=bool(job_requirements.strip()),
-            documents_count=len(documents_results),
-            success_count=success_count,
-            failed_count=failed_count,
-            processing_time=processing_time_total,
-            success=success_count > 0
+            mode=mode
         )
         
-        logger.info(f"{'='*70}")
-        logger.info(f"✅ BATCH ANALYSIS COMPLETE (PASS 1 + PASS 2)")
-        logger.info(f"   Mode: batch (comparative analysis {'enabled' if comparative_analysis else 'not available'})")
-        logger.info(f"   Documents: {success_count} succeeded, {failed_count} failed")
-        logger.info(f"   Comparative analysis: {'Yes' if comparative_analysis else 'No'}")
-        logger.info(f"   Total time: {processing_time_total:.2f}s")
-        logger.info(f"{'='*70}")
+        processing_time = (datetime.now() - start_time).total_seconds()
         
-        return batch_response
+        # Build response
+        candidate_profiles = [CandidateProfile(**p) for p in summary_result["candidates"]]
+        
+        # Prepare comparative analysis payload for frontend
+        comparative_analysis = {
+            "executive_summary": summary_result["ai_executive_assessment"], # Map to summary
+            "comparative_ranking": [], # Needs to be extracted/generated if possible
+            "skill_coverage_matrix": {},
+            "strengths_comparison": "",
+            "weaknesses_comparison": ""
+        }
+        
+        # Build response
+        response = ExecutiveSummaryResponse(
+            mode=mode,
+            batch_id=batch_id,
+            candidates=candidate_profiles,
+            candidate=candidate_profiles[0] if mode == "single" and candidate_profiles else None,
+            documents=candidate_profiles,
+            experience_summary=summary_result["experience_summary"],
+            ai_executive_assessment=summary_result["ai_executive_assessment"],
+            job_requirements=job_requirements,
+            processing_time=processing_time,
+            success=True,
+            comparative_analysis=comparative_analysis
+        )
+        
+        logger.info(f"\n{'='*70}")
+        logger.info(f"✅ BATCH ANALYSIS COMPLETE")
+        logger.info(f"   Mode: {mode}")
+        logger.info(f"   Candidates: {len(response.candidates)}")
+        logger.info(f"   Sections: Profiles, Experience Summary, AI Assessment")
+        logger.info(f"   Time: {processing_time:.2f}s")
+        logger.info(f"{'='*70}\n")
+        
+        return response
     
     except HTTPException as e:
-        logger.error(f"✗ Batch validation failed: {e.detail}")
+        logger.error(f"✗ Validation failed: {e.detail}")
         raise
     
     except Exception as e:
@@ -822,9 +855,14 @@ async def batch_analyze(
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
-        # Cleanup all temp files
+        # Cleanup temp files
         for temp_path in temp_files:
             if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            
                 try:
                     os.remove(temp_path)
                 except:
