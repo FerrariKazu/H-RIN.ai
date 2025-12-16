@@ -167,45 +167,59 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBatch(validFiles);
     }
 
-    function showFileQueue(files) {
-        const queueEl = document.getElementById('file-queue');
-        const queueItemsEl = document.getElementById('queue-items');
-        
-        queueEl.classList.remove('hidden');
-        queueItemsEl.innerHTML = '';
-        
-        files.forEach((file, idx) => {
-            const item = document.createElement('div');
-            item.className = 'queue-item';
-            item.style.cssText = 'display:flex;justify-content:space-between;padding:0.75rem;background:#f5f5f5;margin-bottom:0.5rem;border-radius:0.5rem;border-left:3px solid #007bff;';
-            item.innerHTML = `
-                <div>
-                    <strong>${file.name}</strong>
-                    <small style="display:block;color:#666;">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-                </div>
-                <div style="text-align:right;">
-                    <span class="status-badge" id="status-${idx}" style="display:inline-block;padding:0.25rem 0.75rem;background:#ffc107;color:#000;border-radius:0.25rem;font-size:0.85em;">queued</span>
-                </div>
-            `;
-            queueItemsEl.appendChild(item);
-        });
-    }
+      function showFileQueue(files) {
+          const queueEl = document.getElementById('file-queue');
+          const queueItemsEl = document.getElementById('queue-items');
+          
+          queueEl.classList.remove('hidden');
+          queueItemsEl.innerHTML = '';
+          
+          files.forEach((file, idx) => {
+              const item = document.createElement('div');
+              item.className = 'queue-item';
+              item.innerHTML = `
+                  <div class="queue-item-content">
+                      <strong style="color: #000;">${file.name}</strong>
+                      <small style="display:block;color:#000;">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                  </div>
+                  <div class="queue-item-progress">
+                      <div class="progress-bar" id="progress-${idx}">
+                          <div class="progress-fill" id="progress-fill-${idx}" style="width: 0%;"></div>
+                      </div>
+                      <span class="status-badge" id="status-${idx}">queued</span>
+                  </div>
+              `;
+              queueItemsEl.appendChild(item);
+          });
+      }
 
-    function updateQueueStatus(index, status) {
-        const badge = document.getElementById(`status-${index}`);
-        if (badge) {
-            badge.textContent = status;
-            const colorMap = {
-                'queued': '#ffc107',
-                'uploading': '#007bff',
-                'extracting': '#17a2b8',
-                'analyzing': '#6c63ff',
-                'completed': '#28a745',
-                'failed': '#dc3545'
-            };
-            badge.style.background = colorMap[status] || '#007bff';
-        }
-    }
+      function updateQueueStatus(index, status) {
+          const badge = document.getElementById(`status-${index}`);
+          const progressFill = document.getElementById(`progress-fill-${index}`);
+          
+          if (badge) {
+              badge.textContent = status;
+          }
+          
+          if (progressFill) {
+              const progressMap = {
+                  'queued': 0,
+                  'uploading': 25,
+                  'extracting': 50,
+                  'analyzing': 75,
+                  'completed': 100,
+                  'failed': 100
+              };
+              const progress = progressMap[status] || 0;
+              progressFill.style.width = progress + '%';
+              
+              if (status === 'completed') {
+                  progressFill.style.background = '#28a745';
+              } else if (status === 'failed') {
+                  progressFill.style.background = '#dc3545';
+              }
+          }
+      }
 
     // Logger
     function addLog(msg) {
