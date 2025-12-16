@@ -688,6 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const batchRes = await fetch(`${API_URL}/batch-analyze`, {
                 method: 'POST',
+                headers: { 'ngrok-skip-browser-warning': 'true' },
                 body: formData
             });
             
@@ -712,7 +713,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 addLog(`✓ LLM Score: ${score}/100`);
                 updateQueueStatus(0, 'completed');
             } else {
-                // Batch mode: multiple documents
                 const documents = batchResult.documents || [];
                 addLog(`📊 Batch Results: ${documents.length} documents processed`);
                 
