@@ -1682,7 +1682,7 @@ RIN.ai Team
 ---
 Powered by RIN.ai - Advanced Resume Analysis`);
         
-        window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
     };
 
     window.sendRejectEmail = function(candidateIndex) {
@@ -1700,7 +1700,7 @@ Thank you for your application. After careful review, we have decided not to pro
 Best regards,
 RIN.ai Team`);
         
-        window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
     };
 
 
