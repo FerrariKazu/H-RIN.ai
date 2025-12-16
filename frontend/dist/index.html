@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Buddy - Advanced Resume Analysis</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233da9fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z'/%3E%3Cpath d='M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z'/%3E%3Cpath d='M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4'/%3E%3Cpath d='M17.599 6.5a3 3 0 0 0 .399-1.375'/%3E%3Cpath d='M6.003 5.125A3 3 0 0 0 6.401 6.5'/%3E%3Cpath d='M3.477 10.896a4 4 0 0 1 .585-.396'/%3E%3Cpath d='M19.938 10.5a4 4 0 0 1 .585.396'/%3E%3Cpath d='M6 18a4 4 0 0 1-1.9-7.4'/%3E%3Cpath d='M18 18a4 4 0 0 0 1.9-7.4'/%3E%3C/svg%3E">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&family=Bruno+Ace&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Three.js -->
+
+
+    <!-- Custom CSS -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+  <script type="module" crossorigin src="/assets/index-CQqj4fvX.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-0aKZ3_HW.css">
+</head>
+<body class="dark-theme">
+    
+    <!-- 3D Background -->
+    <canvas id="bg-canvas"></canvas>
+    <div class="bg-overlay"></div>
+
+    <!-- Main App Container -->
+    <div id="app">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="brain-circuit"></i>
+                <span class="logo-text">RIN.ai</span>
+            </div>
+            
+            <nav>
+                <button class="nav-btn active" data-section="upload-section">
+                    <i data-lucide="upload-cloud"></i> Upload
+                </button>
+                <button class="nav-btn" data-section="summary-section" disabled>
+                    <i data-lucide="file-text"></i> Summary
+                </button>
+                <button class="nav-btn" data-section="skills-section" disabled>
+                    <i data-lucide="award"></i> Skills & NLP
+                </button>
+                <button class="nav-btn" data-section="ml-details-section" disabled>
+                    <i data-lucide="bar-chart-2"></i> ML Analysis
+                </button>
+                <button class="nav-btn" data-section="review-section" disabled>
+                    <i data-lucide="check-circle"></i> Review
+                </button>
+            </nav>
+
+            <div class="status-box" id="global-status">
+                <div class="status-indicator"></div>
+                <span id="status-text">System Ready</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content">
+            
+            <!-- Section: Upload -->
+            <section id="upload-section" class="active-section">
+                <div class="hero-text">
+                    <h1 style="font-family: 'Bruno Ace', sans-serif; font-weight: 400; letter-spacing: -2px;"><span style="font-size: 0.5em; color: var(--accent); vertical-align: middle; margin-right: 2px;">H</span>RIN.ai</h1>
+                    <p>Helping HR Members sift through CVs efficiently. The best way.</p>
+                </div>
+
+                <div class="upload-area" id="drop-zone">
+                    <i data-lucide="file-up" class="upload-icon"></i>
+                    <h3>Drag & Drop up to 5 Resume PDFs</h3>
+                    <p>or click to browse</p>
+                    <p class="upload-hint" style="font-size: 0.9em; color: #999; margin-top: 0.5rem;">Max 5 PDFs • PDF format only</p>
+                    <input type="file" id="file-input" accept=".pdf" multiple hidden>
+                </div>
+
+                <!-- File Queue Display -->
+                <div id="file-queue" class="file-queue hidden" style="margin-top: 2rem;">
+                    <h3>Upload Queue</h3>
+                    <div id="queue-items" class="queue-items"></div>
+                </div>
+
+                <!-- Job Requirements Section (Smart UI) -->
+                <div class="job-requirements-section" id="job-requirements-container">
+                    <div class="job-req-header">
+                        <h3><i data-lucide="briefcase"></i> Job Requirements</h3>
+                        <div class="job-req-mode-toggle">
+                            <button class="mode-btn active" data-mode="quick" id="mode-quick">Quick Select</button>
+                            <button class="mode-btn" data-mode="advanced" id="mode-advanced">Advanced</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Select a role preset or customize requirements for AI evaluation</p>
+                    
+                    <!-- Role Preset Cards -->
+                    <div class="role-preset-grid" id="role-presets">
+                        <div class="role-preset-card" data-preset="ml_engineer">
+                            <span class="preset-icon">🤖</span>
+                            <span class="preset-title">ML Engineer</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="data_scientist">
+                            <span class="preset-icon">📊</span>
+                            <span class="preset-title">Data Scientist</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="ai_researcher">
+                            <span class="preset-icon">🧠</span>
+                            <span class="preset-title">AI Researcher</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="fullstack">
+                            <span class="preset-icon">💻</span>
+                            <span class="preset-title">Full Stack</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="backend">
+                            <span class="preset-icon">⚡</span>
+                            <span class="preset-title">Backend</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="frontend">
+                            <span class="preset-icon">🎨</span>
+                            <span class="preset-title">Frontend</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="devops">
+                            <span class="preset-icon">☁️</span>
+                            <span class="preset-title">DevOps</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="data_engineer">
+                            <span class="preset-icon">📈</span>
+                            <span class="preset-title">Data Engineer</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="research_engineer">
+                            <span class="preset-icon">🔬</span>
+                            <span class="preset-title">Research Eng</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="custom">
+                            <span class="preset-icon">➕</span>
+                            <span class="preset-title">Custom</span>
+                        </div>
+                    </div>
+
+                    <!-- Structured Form (Initially Hidden, Shown on Selection) -->
+                    <div class="job-req-form hidden" id="job-req-form">
+                        
+                        <!-- Basic Info -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="basic-info">
+                                <span>📝 Basic Info</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="basic-info">
+                                <div class="form-row">
+                                    <label>Job Title</label>
+                                    <input type="text" id="req-title" placeholder="e.g., Senior Machine Learning Engineer">
+                                </div>
+                                <div class="form-row">
+                                    <label>Seniority Level</label>
+                                    <div class="seniority-options">
+                                        <label class="radio-label"><input type="radio" name="seniority" value="junior"> Junior (0-2 yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="mid"> Mid (3-5 yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="senior" checked> Senior (5+ yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="staff"> Staff (8+ yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="lead"> Lead (10+ yrs)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Technical Skills -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="tech-skills">
+                                <span>💻 Technical Skills</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="tech-skills">
+                                <div class="skill-category">
+                                    <h4>Programming Languages</h4>
+                                    <div class="checkbox-grid" id="languages-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                                <div class="skill-category">
+                                    <h4>Frameworks & Libraries</h4>
+                                    <div class="checkbox-grid" id="frameworks-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                                <div class="skill-category">
+                                    <h4>Tools & Infrastructure</h4>
+                                    <div class="checkbox-grid" id="tools-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Domain Expertise -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="domain-expertise">
+                                <span>🎯 Domain Expertise</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="domain-expertise">
+                                <div class="checkbox-grid" id="domain-grid">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Experience -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="experience-section">
+                                <span>📅 Experience Requirements</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="experience-section">
+                                <div class="form-row">
+                                    <label>Minimum Years of Experience</label>
+                                    <input type="number" id="req-min-years" value="5" min="0" max="20" style="width: 80px;">
+                                </div>
+                                <div class="form-row">
+                                    <label>Must Have Experience With</label>
+                                    <div class="checkbox-grid" id="must-have-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Soft Skills -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="soft-skills">
+                                <span>🤝 Soft Skills</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="soft-skills">
+                                <div class="checkbox-grid" id="soft-skills-grid">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Notes (Fallback Textarea) -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="additional-notes">
+                                <span>📝 Additional Notes</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content collapsed" id="additional-notes">
+                                <textarea id="req-additional-notes" rows="3" placeholder="Any other specific requirements..."></textarea>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Status & Actions -->
+                    <div class="job-req-actions" id="job-req-actions">
+                        <span id="job-req-status" class="job-req-status">No requirements set</span>
+                        <div class="action-buttons">
+                            <button class="btn-secondary" id="clear-job-req" style="display:none;">Clear All</button>
+                            <button class="btn-primary" id="apply-job-req" style="display:none;">Apply Requirements</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing Logs -->
+                <div class="logs-container hidden" id="logs-container">
+                    <div class="logs-header">
+                        <i data-lucide="terminal-square"></i> Live Pipeline Logs
+                    </div>
+                    <div class="logs-content" id="logs-output">
+                        <!-- Logs injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: Summary -->
+            <section id="summary-section" class="hidden-section">
+                <header class="section-header">
+                    <h2>Executive Summary</h2>
+                    <div class="badges" id="header-badges"></div>
+                </header>
+                
+                  <div class="card full-width">
+                      <h3><i data-lucide="user"></i> Candidate Profile</h3>
+                      <div id="profile-content" class="content-text"></div>
+                  </div>
+                  
+                  <div class="card full-width">
+                      <h3><i data-lucide="briefcase"></i> Experience Summary</h3>
+                      <div id="experience-summary" class="content-text"></div>
+                  </div>
+
+                  <div class="card full-width">
+                      <h3><i data-lucide="sparkles"></i> AI Executive Assessment</h3>
+                      <div id="ai-summary" class="markdown-body"></div>
+                  </div>
+
+                <!-- Batch Comparison View (Contains New Dashboard) -->
+                <div class="card full-width" id="batch-comparison" style="display:none;">
+                    <h3><i data-lucide="grid"></i> Candidate Comparison</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <button class="btn-secondary" id="sort-by-score" style="margin-right: 0.5rem;">Sort by Score</button>
+                        <button class="btn-secondary" id="sort-by-name">Sort by Name</button>
+                    </div>
+                    <div id="comparison-table" class="comparison-table"></div>
+                </div>
+            </section>
+
+            <!-- Section: Skills & NLP -->
+            <section id="skills-section" class="hidden-section">
+                <h2>Skills & Entities</h2>
+                <div id="skills-cloud" class="skills-wrapper"></div>
+                
+                <h3>Named Entities (NER)</h3>
+                <div class="table-container">
+                    <table id="entities-table">
+                        <thead>
+                            <tr><th>Entity</th><th>Label</th><th>Confidence</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Section: ML Analysis (Renamed) -->
+            <section id="ml-details-section" class="hidden-section">
+                <h2>Machine Learning Evaluation</h2>
+                <div class="score-card-container">
+                    <div class="score-card">
+                        <div class="score-circle" id="ai-score-circle">--</div>
+                        <span>AI Fit Score</span>
+                    </div>
+                    <div class="card factors-card">
+                        <h3>Evaluation Factors</h3>
+                        <ul id="ml-factors-list"></ul>
+                    </div>
+                </div>
+
+                <!-- Job Fit Analysis (if job requirements provided) -->
+                <div id="job-fit-section" class="hidden-section" style="margin-top: 2rem;">
+                    <h3><i data-lucide="briefcase"></i> Job Requirements Analysis</h3>
+                    <div class="grid-2">
+                        <div class="card">
+                            <h4>Job Match Status</h4>
+                            <p id="job-hire-recommendation" style="font-size: 1.5rem; font-weight: bold; color: var(--accent);"></p>
+                            <p id="job-match-ratio"></p>
+                        </div>
+                        <div class="card">
+                            <h4>Skills Gap Analysis</h4>
+                            <p id="job-skills-summary"></p>
+                        </div>
+                    </div>
+                    <div class="card full-width">
+                        <h4>Missing Skills for This Role</h4>
+                        <div id="job-missing-skills" class="tags-list"></div>
+                    </div>
+                    <div class="card full-width">
+                        <h4>Matched Skills</h4>
+                        <div id="job-matched-skills" class="tags-list"></div>
+                    </div>
+                </div>
+                
+                <h3>Recommended Roles</h3>
+                <div id="roles-list" class="tags-list"></div>
+            </section>
+
+            <!-- Section: Review (Replaces Raw JSON) -->
+            <section id="review-section" class="hidden-section">
+                <header class="section-header">
+                    <h2><i data-lucide="check-circle"></i> Candidate Review</h2>
+                    <p class="section-hint">Review candidates and send personalized emails</p>
+                </header>
+                
+                <div id="review-candidates" class="review-grid">
+                    <!-- Candidate cards will be injected here by JavaScript -->
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="acceptance-modal" class="modal">
+        <div class="modal-content">
+            <h3>✅ Accept Candidate</h3>
+            <p>Accept <strong id="accept-candidate-name">Candidate</strong> for the position?</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="continueAcceptance()">Continue</button>
+                <button class="btn-secondary" onclick="emailAcceptance()">📧 Email</button>
+                <button class="btn-cancel" onclick="closeModal('acceptance-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="refusal-modal" class="modal">
+        <div class="modal-content">
+            <h3>❌ Refuse Candidate</h3>
+            <p>Refuse <strong id="refuse-candidate-name">Candidate</strong>?</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="continueRefusal()">Continue</button>
+                <button class="btn-secondary" onclick="emailRefusal()">📧 Email</button>
+                <button class="btn-cancel" onclick="closeModal('refusal-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

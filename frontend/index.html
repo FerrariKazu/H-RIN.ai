@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HR Buddy - Advanced Resume Analysis</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233da9fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z'/%3E%3Cpath d='M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z'/%3E%3Cpath d='M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4'/%3E%3Cpath d='M17.599 6.5a3 3 0 0 0 .399-1.375'/%3E%3Cpath d='M6.003 5.125A3 3 0 0 0 6.401 6.5'/%3E%3Cpath d='M3.477 10.896a4 4 0 0 1 .585-.396'/%3E%3Cpath d='M19.938 10.5a4 4 0 0 1 .585.396'/%3E%3Cpath d='M6 18a4 4 0 0 1-1.9-7.4'/%3E%3Cpath d='M18 18a4 4 0 0 0 1.9-7.4'/%3E%3C/svg%3E">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&family=Bruno+Ace&display=swap" rel="stylesheet">
     
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -24,7 +25,7 @@
     </script>
 
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=2.7">
 </head>
 <body class="dark-theme">
     
@@ -52,7 +53,7 @@
                 <button class="nav-btn" data-section="skills-section" disabled>
                     <i data-lucide="award"></i> Skills & NLP
                 </button>
-                <button class="nav-btn" data-section="analysis-section" disabled>
+                <button class="nav-btn" data-section="ml-details-section" disabled>
                     <i data-lucide="bar-chart-2"></i> ML Analysis
                 </button>
                 <button class="nav-btn" data-section="review-section" disabled>
@@ -72,8 +73,8 @@
             <!-- Section: Upload -->
             <section id="upload-section" class="active-section">
                 <div class="hero-text">
-                    <h1>AI-Powered Resume Ecosystem</h1>
-                    <p>Production-grade extraction pipeline. No mocks. Pure data.</p>
+                    <h1 style="font-family: 'Bruno Ace', sans-serif; font-weight: 400; letter-spacing: -2px;"><span style="font-size: 0.5em; color: var(--accent); vertical-align: middle; margin-right: 2px;">H</span>RIN.ai</h1>
+                    <p>Helping HR Members sift through CVs efficiently. The best way.</p>
                 </div>
 
                 <div class="upload-area" id="drop-zone">
@@ -90,16 +91,182 @@
                     <div id="queue-items" class="queue-items"></div>
                 </div>
 
-                <!-- Job Requirements Section -->
-                <div class="job-requirements-section">
-                    <h3><i data-lucide="briefcase"></i> Job Requirements (Optional)</h3>
-                    <p class="section-hint">Provide the target job description to enable job-specific analysis</p>
-                    <textarea id="job-requirements-input" 
-                              placeholder="Paste job description, title, required skills, seniority level, etc.&#10;&#10;Example:&#10;Senior Full Stack Engineer - React, Node.js, AWS&#10;5+ years experience&#10;Must know: TypeScript, PostgreSQL, Docker&#10;Nice to have: Kubernetes, Terraform"
-                              rows="8"></textarea>
-                    <div class="job-req-info">
-                        <span id="job-req-status">No job requirements provided</span>
-                        <button class="btn-secondary" id="clear-job-req" style="display:none;">Clear</button>
+                <!-- Job Requirements Section (Smart UI) -->
+                <div class="job-requirements-section" id="job-requirements-container">
+                    <div class="job-req-header">
+                        <h3><i data-lucide="briefcase"></i> Job Requirements</h3>
+                        <div class="job-req-mode-toggle">
+                            <button class="mode-btn active" data-mode="quick" id="mode-quick">Quick Select</button>
+                            <button class="mode-btn" data-mode="advanced" id="mode-advanced">Advanced</button>
+                        </div>
+                    </div>
+                    <p class="section-hint">Select a role preset or customize requirements for AI evaluation</p>
+                    
+                    <!-- Role Preset Cards -->
+                    <div class="role-preset-grid" id="role-presets">
+                        <div class="role-preset-card" data-preset="ml_engineer">
+                            <span class="preset-icon">🤖</span>
+                            <span class="preset-title">ML Engineer</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="data_scientist">
+                            <span class="preset-icon">📊</span>
+                            <span class="preset-title">Data Scientist</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="ai_researcher">
+                            <span class="preset-icon">🧠</span>
+                            <span class="preset-title">AI Researcher</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="fullstack">
+                            <span class="preset-icon">💻</span>
+                            <span class="preset-title">Full Stack</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="backend">
+                            <span class="preset-icon">⚡</span>
+                            <span class="preset-title">Backend</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="frontend">
+                            <span class="preset-icon">🎨</span>
+                            <span class="preset-title">Frontend</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="devops">
+                            <span class="preset-icon">☁️</span>
+                            <span class="preset-title">DevOps</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="data_engineer">
+                            <span class="preset-icon">📈</span>
+                            <span class="preset-title">Data Engineer</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="research_engineer">
+                            <span class="preset-icon">🔬</span>
+                            <span class="preset-title">Research Eng</span>
+                        </div>
+                        <div class="role-preset-card" data-preset="custom">
+                            <span class="preset-icon">➕</span>
+                            <span class="preset-title">Custom</span>
+                        </div>
+                    </div>
+
+                    <!-- Structured Form (Initially Hidden, Shown on Selection) -->
+                    <div class="job-req-form hidden" id="job-req-form">
+                        
+                        <!-- Basic Info -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="basic-info">
+                                <span>📝 Basic Info</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="basic-info">
+                                <div class="form-row">
+                                    <label>Job Title</label>
+                                    <input type="text" id="req-title" placeholder="e.g., Senior Machine Learning Engineer">
+                                </div>
+                                <div class="form-row">
+                                    <label>Seniority Level</label>
+                                    <div class="seniority-options">
+                                        <label class="radio-label"><input type="radio" name="seniority" value="junior"> Junior (0-2 yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="mid"> Mid (3-5 yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="senior" checked> Senior (5+ yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="staff"> Staff (8+ yrs)</label>
+                                        <label class="radio-label"><input type="radio" name="seniority" value="lead"> Lead (10+ yrs)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Technical Skills -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="tech-skills">
+                                <span>💻 Technical Skills</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="tech-skills">
+                                <div class="skill-category">
+                                    <h4>Programming Languages</h4>
+                                    <div class="checkbox-grid" id="languages-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                                <div class="skill-category">
+                                    <h4>Frameworks & Libraries</h4>
+                                    <div class="checkbox-grid" id="frameworks-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                                <div class="skill-category">
+                                    <h4>Tools & Infrastructure</h4>
+                                    <div class="checkbox-grid" id="tools-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Domain Expertise -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="domain-expertise">
+                                <span>🎯 Domain Expertise</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="domain-expertise">
+                                <div class="checkbox-grid" id="domain-grid">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Experience -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="experience-section">
+                                <span>📅 Experience Requirements</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="experience-section">
+                                <div class="form-row">
+                                    <label>Minimum Years of Experience</label>
+                                    <input type="number" id="req-min-years" value="5" min="0" max="20" style="width: 80px;">
+                                </div>
+                                <div class="form-row">
+                                    <label>Must Have Experience With</label>
+                                    <div class="checkbox-grid" id="must-have-grid">
+                                        <!-- Populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Soft Skills -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="soft-skills">
+                                <span>🤝 Soft Skills</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content" id="soft-skills">
+                                <div class="checkbox-grid" id="soft-skills-grid">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Notes (Fallback Textarea) -->
+                        <div class="form-section">
+                            <div class="section-toggle" data-section="additional-notes">
+                                <span>📝 Additional Notes</span>
+                                <i data-lucide="chevron-down" class="toggle-icon"></i>
+                            </div>
+                            <div class="section-content collapsed" id="additional-notes">
+                                <textarea id="req-additional-notes" rows="3" placeholder="Any other specific requirements..."></textarea>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Status & Actions -->
+                    <div class="job-req-actions" id="job-req-actions">
+                        <span id="job-req-status" class="job-req-status">No requirements set</span>
+                        <div class="action-buttons">
+                            <button class="btn-secondary" id="clear-job-req" style="display:none;">Clear All</button>
+                            <button class="btn-primary" id="apply-job-req" style="display:none;">Apply Requirements</button>
+                        </div>
                     </div>
                 </div>
 
@@ -136,7 +303,7 @@
                       <div id="ai-summary" class="markdown-body"></div>
                   </div>
 
-                <!-- Batch Comparison View -->
+                <!-- Batch Comparison View (Contains New Dashboard) -->
                 <div class="card full-width" id="batch-comparison" style="display:none;">
                     <h3><i data-lucide="grid"></i> Candidate Comparison</h3>
                     <div style="margin-bottom: 1rem;">
@@ -163,8 +330,8 @@
                 </div>
             </section>
 
-            <!-- Section: ML Analysis -->
-            <section id="analysis-section" class="hidden-section">
+            <!-- Section: ML Analysis (Renamed) -->
+            <section id="ml-details-section" class="hidden-section">
                 <h2>Machine Learning Evaluation</h2>
                 <div class="score-card-container">
                     <div class="score-card">
@@ -247,7 +414,7 @@
 
     <!-- Scripts -->
     <script type="module" src="js/three-bg.js"></script>
-    <script src="js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
     <script>
         lucide.createIcons();
     </script>

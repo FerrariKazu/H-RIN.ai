@@ -2,101 +2,103 @@ import * as THREE from 'three';
 
 const canvas = document.querySelector('#bg-canvas');
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
 
+// Camera setup
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 1000;
+
+// Render setup
+const renderer = new THREE.WebGLRenderer({ 
+    canvas, 
+    alpha: true, 
+    antialias: true,
+    powerPreference: "high-performance"
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-// Light Pillar Geometry (Cylinder with additive blending)
-const geometry = new THREE.CylinderGeometry(2, 2, 20, 32, 1, true);
+// STARFIELD CONFIGURATION
+const particlesGeometry = new THREE.BufferGeometry();
+const particlesCount = 1500; // Optimal for 60fps on most devices
+
+const posArray = new Float32Array(particlesCount * 3);
+// Brightness/Size variation
+const sizesArray = new Float32Array(particlesCount); 
+
+for(let i = 0; i < particlesCount; i++) {
+    // Spread stars in a large volume
+    const i3 = i * 3;
+    posArray[i3] = (Math.random() - 0.5) * 2000;
+    posArray[i3 + 1] = (Math.random() - 0.5) * 2000;
+    posArray[i3 + 2] = (Math.random() - 0.5) * 2000;
+    
+    // Random sizes for depth perception (Increased size for visibility)
+    sizesArray[i] = 1.0 + Math.random() * 4.0;
+}
+
+particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+particlesGeometry.setAttribute('size', new THREE.BufferAttribute(sizesArray, 1));
+
+// Custom Shader for soft, glowing stars
 const material = new THREE.ShaderMaterial({
     uniforms: {
         time: { value: 0 },
-        color: { value: new THREE.Color('#3da9fa') }
+        pointTexture: { value: new THREE.TextureLoader().load('https://assets.codepen.io/16327/particle.png') } // Fallback or procedural
     },
     vertexShader: `
-        varying vec2 vUv;
+        attribute float size;
+        varying vec3 vColor;
+        uniform float time;
         void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+            
+            // Parallax movement effect based on position
+            float timeOffset = position.y * 0.001;
+            float pulse = 1.0 + sin(time * 2.0 + timeOffset) * 0.2;
+            
+            // Increased scale for better clearity
+            gl_PointSize = size * (400.0 / -mvPosition.z) * pulse;
+            gl_Position = projectionMatrix * mvPosition;
         }
     `,
     fragmentShader: `
-        uniform float time;
-        uniform vec3 color;
-        varying vec2 vUv;
-        
         void main() {
-            // Gradient fade from bottom to top
-            float opacity = (1.0 - vUv.y) * 0.5;
+            // Circular particle drawing (procedural texture)
+            vec2 uv = gl_PointCoord.xy - 0.5;
+            float r = length(uv);
+            if (r > 0.5) discard;
             
-            // Dynamic pulse
-            float pulse = 0.8 + 0.2 * sin(time * 2.0);
+            // Soft glow (white center, varying opacity)
+            float alpha = 1.0 - smoothstep(0.3, 0.5, r);
             
-            // Scanlines
-            float scanline = sin(gl_FragCoord.y * 0.1 - time * 5.0) * 0.1;
-            
-            vec3 finalColor = color + scanline;
-            gl_FragColor = vec4(finalColor, opacity * pulse);
+            gl_FragColor = vec4(1.0, 1.0, 1.0, alpha * 0.8); // Pure white stars
         }
     `,
     transparent: true,
-    side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending
 });
 
-const pillar = new THREE.Mesh(geometry, material);
-scene.add(pillar);
+const starField = new THREE.Points(particlesGeometry, material);
+scene.add(starField);
 
-// Particles
-const particlesGeometry = new THREE.BufferGeometry();
-const particlesCount = 200;
-const posArray = new Float32Array(particlesCount * 3);
+// Subtle fog for depth blending into the dark blue background
+scene.fog = new THREE.FogExp2(0x0a192f, 0.0005); // Matches dark blue theme
 
-for(let i = 0; i < particlesCount * 3; i++) {
-    posArray[i] = (Math.random() - 0.5) * 15;
-}
-
-particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-const particlesMaterial = new THREE.PointsMaterial({
-    size: 0.05,
-    color: '#ff8906',
-    transparent: true,
-    opacity: 0.8,
-    blending: THREE.AdditiveBlending
-});
-
-const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-scene.add(particlesMesh);
-
-// Post-processing setup could go here, but keeping it simple for raw three.js
-
-camera.position.z = 8;
-camera.position.y = 2;
-camera.lookAt(0, 0, 0);
-
+// Animation Loop
 const clock = new THREE.Clock();
 
 function animate() {
     requestAnimationFrame(animate);
-    
     const elapsedTime = clock.getElapsedTime();
-    
-    // Animate shader
-    material.uniforms.time.value = elapsedTime;
-    
-    // Rotate pillar
-    pillar.rotation.y = elapsedTime * 0.1;
-    
-    // Float particles
-    particlesMesh.rotation.y = -elapsedTime * 0.05;
-    particlesMesh.position.y = Math.sin(elapsedTime * 0.5) * 0.5;
 
-    // Mouse parallax (simple)
-    // camera.position.x += (mouseX - camera.position.x) * 0.05;
-    
+    // Update shader uniforms
+    material.uniforms.time.value = elapsedTime;
+
+    // Slow, soothing rotation
+    starField.rotation.y = elapsedTime * 0.05;
+    starField.rotation.x = elapsedTime * 0.02;
+
     renderer.render(scene, camera);
 }
 
@@ -105,6 +107,7 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
 animate();
